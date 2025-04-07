@@ -1,36 +1,26 @@
-import { Logger } from 'winston'
-import { WebSocket } from 'ws'
-import { WebSocketTopicBase, WebSocketTopic } from '../wsHandler'
-import { literal } from '@sofie-automation/corelib/dist/lib'
-import { unprotectString } from '@sofie-automation/shared-lib/dist/lib/protectedString'
-import _ = require('underscore')
 import { IBlueprintActionManifestDisplayContent } from '@sofie-automation/blueprints-integration'
-import { ShowStyleBaseExt } from '../collections/showStyleBaseHandler'
 import { Bucket } from '@sofie-automation/corelib/dist/dataModel/Bucket'
 import { BucketAdLibAction } from '@sofie-automation/corelib/dist/dataModel/BucketAdLibAction'
 import { BucketAdLib } from '@sofie-automation/corelib/dist/dataModel/BucketAdLibPiece'
+import { literal } from '@sofie-automation/corelib/dist/lib'
 import { interpollateTranslation } from '@sofie-automation/corelib/dist/TranslatableMessage'
-import { AdLibActionType, AdLibStatus } from './adLibsTopic'
-import { CollectionHandlers } from '../liveStatusServer'
-import { sortContent, WithSortingMetadata } from './helpers/contentSorting'
+import { unprotectString } from '@sofie-automation/shared-lib/dist/lib/protectedString'
 import { PickKeys } from '@sofie-automation/shared-lib/dist/lib/types'
+import { Logger } from 'winston'
+import { WebSocket } from 'ws'
+import { ShowStyleBaseExt } from '../collections/showStyleBaseHandler'
+import { CollectionHandlers } from '../liveStatusServer'
+import { WebSocketTopic, WebSocketTopicBase } from '../wsHandler'
+import { sortContent, WithSortingMetadata } from './helpers/contentSorting'
+import _ = require('underscore')
+import {
+	BucketsEvent,
+	BucketStatus,
+	BucketAdLibStatus,
+	AdLibActionType,
+} from '@sofie-automation/live-status-gateway-api'
 
 const THROTTLE_PERIOD_MS = 100
-
-export interface BucketsStatus {
-	event: 'buckets'
-	buckets: BucketStatus[]
-}
-
-interface BucketAdLibStatus extends Omit<AdLibStatus, 'partId' | 'segmentId'> {
-	externalId: string
-}
-
-export interface BucketStatus {
-	id: string
-	name: string
-	adLibs: BucketAdLibStatus[]
-}
 
 const SHOW_STYLE_BASE_KEYS = ['sourceLayerNamesById', 'outputLayerNamesById'] as const
 type ShowStyle = PickKeys<ShowStyleBaseExt, typeof SHOW_STYLE_BASE_KEYS>
@@ -69,7 +59,7 @@ export class BucketsTopic extends WebSocketTopicBase implements WebSocketTopic {
 			}
 		})
 
-		const bucketsStatus: BucketsStatus = {
+		const bucketsStatus: BucketsEvent = {
 			event: 'buckets',
 			buckets: bucketStatuses,
 		}

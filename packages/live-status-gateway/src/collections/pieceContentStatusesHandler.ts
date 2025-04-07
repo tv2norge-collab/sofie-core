@@ -1,13 +1,13 @@
+import { CustomCollectionName } from '@sofie-automation/corelib/dist/dataModel/Collections'
+import { RundownPlaylistId } from '@sofie-automation/corelib/dist/dataModel/Ids'
+import { UIPieceContentStatus } from '@sofie-automation/corelib/dist/dataModel/PieceContentStatus'
+import { DBRundownPlaylist } from '@sofie-automation/corelib/dist/dataModel/RundownPlaylist'
+import { CorelibPubSub } from '@sofie-automation/corelib/dist/pubsub'
+import throttleToNextTick from '@sofie-automation/shared-lib/dist/lib/throttleToNextTick'
+import { PickKeys } from '@sofie-automation/shared-lib/dist/lib/types'
 import { Logger } from 'winston'
 import { CoreHandler } from '../coreHandler'
-import { DBRundownPlaylist } from '@sofie-automation/corelib/dist/dataModel/RundownPlaylist'
-import { UIPieceContentStatus } from '@sofie-automation/corelib/dist/dataModel/PieceContentStatus'
-import throttleToNextTick from '@sofie-automation/shared-lib/dist/lib/throttleToNextTick'
-import { RundownPlaylistId } from '@sofie-automation/corelib/dist/dataModel/Ids'
-import { CorelibPubSub } from '@sofie-automation/corelib/dist/pubsub'
 import { CollectionHandlers } from '../liveStatusServer'
-import { CustomCollectionName } from '@sofie-automation/corelib/dist/dataModel/Collections'
-import { PickKeys } from '@sofie-automation/shared-lib/dist/lib/types'
 import { PublicationCollection } from '../publicationCollection'
 
 const PLAYLIST_KEYS = ['_id'] as const
@@ -34,7 +34,7 @@ export class PieceContentStatusesHandler extends PublicationCollection<
 		handlers.playlistHandler.subscribe(this.onPlaylistUpdated, PLAYLIST_KEYS)
 	}
 
-	changed(): void {
+	protected changed(): void {
 		this._throttledUpdateAndNotify()
 	}
 
