@@ -1,4 +1,4 @@
-import { mkdir, access, constants } from 'fs/promises'
+import fs from 'fs/promises'
 import { exit } from 'process'
 import wget from 'wget-improved'
 
@@ -30,15 +30,17 @@ async function get(url, path) {
 
 async function checkInstall() {
 	console.log('Checking/Installing swagger codegen.')
-	await mkdir('jars').catch((e) => {
+	await fs.mkdir('jars').catch((e) => {
 		if (e.code === 'EEXIST') return
 		else throw e
 	})
 
 	const srcPath =
-		'https://repo1.maven.org/maven2/io/swagger/codegen/v3/swagger-codegen-cli/3.0.68/swagger-codegen-cli-3.0.68.jar'
+		'https://repo1.maven.org/maven2/io/swagger/codegen/v3/swagger-codegen-cli/3.0.34/swagger-codegen-cli-3.0.34.jar'
 	const swaggerFilename = 'swagger-codegen-cli.jar'
-	await access(`jars/${swaggerFilename}`, constants.R_OK).catch(async () => get(srcPath, `jars/${swaggerFilename}`))
+	await fs
+		.access(`jars/${swaggerFilename}`, fs.constants.R_OK)
+		.catch(async () => get(srcPath, `jars/${swaggerFilename}`))
 }
 
 await checkInstall()
