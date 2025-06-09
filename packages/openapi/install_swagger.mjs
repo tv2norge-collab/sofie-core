@@ -1,5 +1,6 @@
 import fs from 'fs/promises'
 import { exit } from 'process'
+// eslint-disable-next-line n/no-unpublished-import
 import wget from 'wget-improved'
 
 async function get(url, path) {
