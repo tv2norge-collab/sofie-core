@@ -158,6 +158,8 @@ export interface BlueprintResultApplyStudioConfig {
 	routeSetExclusivityGroups?: Record<string, StudioRouteSetExclusivityGroup>
 	/** Package Containers */
 	packageContainers?: Record<string, StudioPackageContainer>
+	/** Which Package Containers are used for media previews/thumbnails in GUI */
+	containerIds?: string[]
 
 	studioSettings?: IStudioSettings
 }

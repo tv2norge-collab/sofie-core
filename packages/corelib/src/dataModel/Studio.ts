@@ -76,9 +76,8 @@ export interface DBStudio {
 	 */
 	packageContainersWithOverrides: ObjectWithOverrides<Record<string, StudioPackageContainer>>
 
-	/** Which package containers is used for media previews in GUI */
-	previewContainerIds: string[]
-	thumbnailContainerIds: string[]
+	/** Which package containers are used for media previews/thumbnails in GUI */
+	packageContainerIdsWithOverrides: ObjectWithOverrides<StudioContainerIds>
 
 	peripheralDeviceSettings: StudioPeripheralDeviceSettings
 
@@ -139,4 +138,9 @@ export interface StudioDeviceSettings {
 	name: string
 
 	options: unknown
+}
+
+export interface StudioContainerIds {
+	previewContainerIds: string[]
+	thumbnailContainerIds: string[]
 }
