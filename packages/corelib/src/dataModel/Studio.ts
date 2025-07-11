@@ -13,7 +13,10 @@ import {
 	StudioRouteType,
 	StudioAbPlayerDisabling,
 } from '@sofie-automation/shared-lib/dist/core/model/StudioRouteSet'
-import { StudioPackageContainer } from '@sofie-automation/shared-lib/dist/core/model/PackageContainer'
+import {
+	StudioPackageContainer,
+	StudioPackageContainerIds,
+} from '@sofie-automation/shared-lib/dist/core/model/PackageContainer'
 import { IStudioSettings } from '@sofie-automation/shared-lib/dist/core/model/StudioSettings'
 
 export { MappingsExt, MappingExt, MappingsHash, IStudioSettings }
@@ -77,7 +80,7 @@ export interface DBStudio {
 	packageContainersWithOverrides: ObjectWithOverrides<Record<string, StudioPackageContainer>>
 
 	/** Which package containers are used for media previews/thumbnails in GUI */
-	packageContainerIdsWithOverrides: ObjectWithOverrides<StudioContainerIds>
+	packageContainerIdsWithOverrides: ObjectWithOverrides<StudioPackageContainerIds>
 
 	peripheralDeviceSettings: StudioPeripheralDeviceSettings
 
@@ -138,9 +141,4 @@ export interface StudioDeviceSettings {
 	name: string
 
 	options: unknown
-}
-
-export interface StudioContainerIds {
-	previewContainerIds: string[]
-	thumbnailContainerIds: string[]
 }

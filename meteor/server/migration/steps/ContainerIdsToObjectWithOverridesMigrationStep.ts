@@ -4,7 +4,7 @@ import {
 	convertObjectIntoOverrides,
 	ObjectWithOverrides,
 } from '@sofie-automation/corelib/dist/settings/objectWithOverrides'
-import { StudioContainerIds } from '@sofie-automation/corelib/dist/dataModel/Studio'
+import { StudioPackageContainerIds } from '@sofie-automation/shared-lib/dist/core/model/PackageContainer'
 
 export class ContainerIdsToObjectWithOverridesMigrationStep implements Omit<MigrationStepCore, 'version'> {
 	public readonly id = `convert previewContainerIds to ObjectWithOverrides`
@@ -32,7 +32,7 @@ export class ContainerIdsToObjectWithOverridesMigrationStep implements Omit<Migr
 			const newPackageContainers = convertObjectIntoOverrides({
 				previewContainerIds: oldPreviewContainerIds ?? [],
 				thumbnailContainerIds: oldThumbnailContainerIds ?? [],
-			} satisfies StudioContainerIds) as ObjectWithOverrides<StudioContainerIds>
+			} satisfies StudioPackageContainerIds) as ObjectWithOverrides<StudioPackageContainerIds>
 
 			await Studios.updateAsync(studio._id, {
 				$set: {

@@ -23,7 +23,6 @@ import {
 	MappingExt,
 	MappingsExt,
 	ResultingMappingRoutes,
-	StudioContainerIds,
 	StudioPackageContainer,
 	StudioRouteSet,
 } from '@sofie-automation/corelib/dist/dataModel/Studio'
@@ -49,6 +48,7 @@ import {
 import { PieceContentStatusObj } from '@sofie-automation/corelib/dist/dataModel/PieceContentStatus'
 import { PieceContentStatusMessageFactory, PieceContentStatusMessageRequiredArgs } from './messageFactory'
 import { PackageStatusMessage } from '@sofie-automation/shared-lib/dist/packageStatusMessages'
+import { StudioPackageContainerIds } from '@sofie-automation/shared-lib/dist/core/model/PackageContainer'
 
 const DEFAULT_MESSAGE_FACTORY = new PieceContentStatusMessageFactory(undefined)
 
@@ -206,7 +206,7 @@ export interface PieceContentStatusStudio extends Pick<DBStudio, '_id'> {
 	 */
 	packageContainers: Record<string, StudioPackageContainer>
 
-	packageContainerIds: StudioContainerIds
+	packageContainerIds: StudioPackageContainerIds
 
 	settings: IStudioSettings
 }

@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { DBStudio, StudioContainerIds, StudioPackageContainer } from '@sofie-automation/corelib/dist/dataModel/Studio'
+import { DBStudio, StudioPackageContainer } from '@sofie-automation/corelib/dist/dataModel/Studio'
 import { useTranslation } from 'react-i18next'
 import { Accessor } from '@sofie-automation/blueprints-integration'
 import { Studios } from '../../../../collections'
@@ -13,6 +13,7 @@ import {
 } from '@sofie-automation/corelib/dist/settings/objectWithOverrides'
 import { MultiSelectInputControl } from '../../../../lib/Components/MultiSelectInput'
 import { useMemo } from 'react'
+import { StudioPackageContainerIds } from '@sofie-automation/shared-lib/dist/core/model/PackageContainer'
 
 interface PackageContainersPickersProps {
 	studio: DBStudio
@@ -34,7 +35,7 @@ export function PackageContainersPickers({
 
 		const computedValue = applyAndValidateOverrides(studio.packageContainerIdsWithOverrides).obj
 
-		const wrappedItem: WrappedOverridableItemNormal<StudioContainerIds> = {
+		const wrappedItem: WrappedOverridableItemNormal<StudioPackageContainerIds> = {
 			type: 'normal',
 			id: '0',
 			computed: computedValue,
@@ -42,7 +43,7 @@ export function PackageContainersPickers({
 			overrideOps: prefixedOps,
 		}
 
-		const wrappedConfigObject: ObjectWithOverrides<StudioContainerIds> = {
+		const wrappedConfigObject: ObjectWithOverrides<StudioPackageContainerIds> = {
 			defaults: studio.packageContainerIdsWithOverrides.defaults,
 			overrides: prefixedOps,
 		}

@@ -26,7 +26,10 @@ import type {
 	StudioRouteSet,
 	StudioRouteSetExclusivityGroup,
 } from '@sofie-automation/shared-lib/dist/core/model/StudioRouteSet'
-import type { StudioPackageContainer } from '@sofie-automation/shared-lib/dist/core/model/PackageContainer'
+import type {
+	StudioPackageContainer,
+	StudioPackageContainerIds,
+} from '@sofie-automation/shared-lib/dist/core/model/PackageContainer'
 import type { IStudioSettings } from '@sofie-automation/shared-lib/dist/core/model/StudioSettings'
 
 export interface StudioBlueprintManifest<TRawConfig = IBlueprintConfig, TProcessedConfig = unknown>
@@ -159,7 +162,7 @@ export interface BlueprintResultApplyStudioConfig {
 	/** Package Containers */
 	packageContainers?: Record<string, StudioPackageContainer>
 	/** Which Package Containers are used for media previews/thumbnails in GUI */
-	containerIds?: string[]
+	packageContainerIds?: StudioPackageContainerIds
 
 	studioSettings?: IStudioSettings
 }

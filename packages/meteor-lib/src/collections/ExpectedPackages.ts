@@ -1,11 +1,11 @@
 import { ExpectedPackage } from '@sofie-automation/blueprints-integration'
 import { assertNever, literal } from '@sofie-automation/corelib/dist/lib'
-import { StudioContainerIds } from '@sofie-automation/corelib/dist/dataModel/Studio'
 import * as deepExtend from 'deep-extend'
 import {
 	htmlTemplateGetSteps,
 	htmlTemplateGetFileNamesFromSteps,
 } from '@sofie-automation/shared-lib/dist/package-manager/helpers'
+import { StudioPackageContainerIds } from '@sofie-automation/shared-lib/dist/core/model/PackageContainer'
 
 export function getPreviewPackageSettings(
 	expectedPackage: ExpectedPackage.Any
@@ -56,7 +56,7 @@ export function getThumbnailPackageSettings(
 }
 export function getSideEffect(
 	expectedPackage: ExpectedPackage.Base,
-	packageContainerIds: StudioContainerIds
+	packageContainerIds: StudioPackageContainerIds
 ): ExpectedPackage.Base['sideEffect'] {
 	return deepExtend(
 		{},
