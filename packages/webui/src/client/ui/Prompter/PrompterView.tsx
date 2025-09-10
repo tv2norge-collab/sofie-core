@@ -14,7 +14,13 @@ import {
 	useTracker,
 } from '../../lib/ReactMeteorData/ReactMeteorData'
 
-import { PartInstanceId, PieceId, RundownPlaylistId, StudioId } from '@sofie-automation/corelib/dist/dataModel/Ids'
+import {
+	PartId,
+	PartInstanceId,
+	PieceId,
+	RundownPlaylistId,
+	StudioId,
+} from '@sofie-automation/corelib/dist/dataModel/Ids'
 import { Rundown } from '@sofie-automation/corelib/dist/dataModel/Rundown'
 import { CorelibPubSub } from '@sofie-automation/corelib/dist/pubsub'
 import { withTranslation } from 'react-i18next'
@@ -22,7 +28,7 @@ import { MeteorPubSub } from '@sofie-automation/meteor-lib/dist/api/pubsub'
 import { UIStudio } from '@sofie-automation/meteor-lib/dist/api/studios'
 import { RundownPlaylistCollectionUtil } from '../../collections/rundownPlaylistUtil'
 import { firstIfArray } from '../../lib/lib'
-import { protectString } from '@sofie-automation/corelib/dist/protectedString'
+import { protectString, unprotectString } from '@sofie-automation/corelib/dist/protectedString'
 import { logger } from '../../lib/logging'
 import { RundownPlaylists, Rundowns } from '../../collections'
 import { documentTitle } from '../../lib/DocumentTitleProvider'
@@ -281,7 +287,10 @@ export class PrompterViewContent extends React.Component<Translated<IProps & ITr
 		this.autoScrollPreviousPartInstanceId = playlist.currentPartInfo?.partInstanceId ?? null
 		if (playlist.currentPartInfo === null) return
 
-		this.scrollToPartInstance(playlist.currentPartInfo.partInstanceId)
+		// scrolls to a part instance, but only if it isn't showing a continuation of an infinite script piece
+		// those should not be scrolled to, because they are empty; it's the original part that holds the text
+		// and it should remain in view
+		this.scrollToPartInstanceIfNotContinuation(playlist.currentPartInfo.partInstanceId)
 	}
 	private calculateScrollPosition() {
 		let pixelMargin = this.calculateMarginPosition()
@@ -316,11 +325,13 @@ export class PrompterViewContent extends React.Component<Translated<IProps & ITr
 		}))
 	}
 
-	scrollToPartInstance(partInstanceId: PartInstanceId): void {
+	scrollToPartInstanceIfNotContinuation(partInstanceId: PartInstanceId): void {
 		const scrollMargin = this.calculateScrollPosition()
 		const target = document.querySelector<HTMLElement>(`[data-part-instance-id="${partInstanceId}"]`)
 
 		if (!target) return
+
+		if (target.dataset.containsPieceContinuation === 'true') return
 
 		const targetOffsetTop = target.getBoundingClientRect().top + window.pageYOffset
 		this.animateScrollTo(targetOffsetTop - scrollMargin)
@@ -976,15 +987,15 @@ const PrompterContent = withTranslation()(
 						return
 					}
 
-					const firstPart = segment.parts[0]
-					const firstPartStatus = this.getPartStatus(prompterData, firstPart)
+					let partIdToHideScriptFor: PartId | undefined
+					const partStatuses = segment.parts.map((part) => this.getPartStatus(prompterData, part))
 
 					lines.push(
 						<div
 							id={`segment_${segment.id}`}
 							data-obj-id={segment.id}
 							key={'segment_' + segment.id}
-							className={ClassNames('prompter-segment', 'scroll-anchor', firstPartStatus)}
+							className={ClassNames('prompter-segment', 'scroll-anchor', partStatuses[0])}
 						>
 							{segment.title || 'N/A'}
 						</div>
@@ -992,23 +1003,71 @@ const PrompterContent = withTranslation()(
 
 					hasInsertedScript = true
 
-					for (const part of segment.parts) {
+					for (let i = 0; i < segment.parts.length; i++) {
+						const part = segment.parts[i]
+
+						const firstPiece = part.pieces[0]
+						if (
+							firstPiece &&
+							firstPiece.continuationOf &&
+							partStatuses[i] === 'live' &&
+							segment.parts.find((part) => part.id === firstPiece.startPartId)
+						) {
+							// the i-th part is live and has taken over the infinite script from the start part,
+							// therefore we need to hide the script from the start part
+							partIdToHideScriptFor = firstPiece.startPartId
+							break
+						}
+					}
+
+					for (let i = 0; i < segment.parts.length; i++) {
+						const part = segment.parts[i]
+
+						let partElementId = unprotectString(part.id)
+
+						if (partIdToHideScriptFor === part.id) {
+							// this prevents id collision with the live part that contains the continuation, overriden in `else if` below
+							partElementId += '_hidden'
+						} else if (!!part.pieces[0]?.continuationOf && partStatuses[i] === 'live' && partIdToHideScriptFor) {
+							// the i-th part is live and has taken over the infinite script from the `partIdToHideScriptFor` part,
+							// therefore we need to use `partIdToHideScriptFor` as the id, so that `restoreScrollAnchor` thinks
+							// this is the same part where the intinite has started
+							partElementId = unprotectString(partIdToHideScriptFor)
+						}
+
 						lines.push(
 							<div
-								id={`part_${part.id}`}
+								id={`part_${partElementId}`}
 								data-obj-id={segment.id + '_' + part.id}
 								data-part-instance-id={part.partInstanceId}
+								data-contains-piece-continuation={!!part.pieces[0]?.continuationOf}
 								key={'part_' + part.id}
-								className={ClassNames('prompter-part', 'scroll-anchor', this.getPartStatus(prompterData, part))}
+								className={ClassNames('prompter-part', 'scroll-anchor', partStatuses[i])}
 							>
 								{part.title || 'N/A'}
 							</div>
 						)
 
 						for (const line of part.pieces) {
+							let pieceElementId = unprotectString(line.id)
+
+							if (partIdToHideScriptFor === part.id) {
+								// prevent id collision
+								pieceElementId += '_hidden'
+							} else if (partStatuses[i] === 'live' && line.continuationOf) {
+								// again we need to override the id, so that `restoreScrollAnchor` thinks this is the same piece
+								// that the infinite script started in
+								pieceElementId = unprotectString(line.continuationOf)
+							}
+
+							let text = line.text || ''
+
+							if ((line.continuationOf && partStatuses[i] !== 'live') || partIdToHideScriptFor === part.id) {
+								text = ''
+							}
 							lines.push(
 								<div
-									id={`line_${line.id}`}
+									id={`line_${pieceElementId}`}
 									data-obj-id={segment.id + '_' + part.id + '_' + line.id}
 									key={'line_' + part.id + '_' + segment.id + '_' + line.id}
 									className={ClassNames(
@@ -1017,7 +1076,7 @@ const PrompterContent = withTranslation()(
 										!line.text ? 'empty' : undefined
 									)}
 								>
-									{line.text || ''}
+									{text}
 								</div>
 							)
 						}
@@ -1026,7 +1085,11 @@ const PrompterContent = withTranslation()(
 			}
 
 			if (hasInsertedScript) {
-				lines.push(<div className="prompter-break end">—{t('End of script')}—</div>)
+				lines.push(
+					<div className="prompter-break end" key="prompter_break">
+						—{t('End of script')}—
+					</div>
+				)
 			}
 
 			return lines
