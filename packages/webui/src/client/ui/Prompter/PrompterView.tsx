@@ -14,13 +14,7 @@ import {
 	useTracker,
 } from '../../lib/ReactMeteorData/ReactMeteorData'
 
-import {
-	PartId,
-	PartInstanceId,
-	PieceId,
-	RundownPlaylistId,
-	StudioId,
-} from '@sofie-automation/corelib/dist/dataModel/Ids'
+import { PartInstanceId, PieceId, RundownPlaylistId, StudioId } from '@sofie-automation/corelib/dist/dataModel/Ids'
 import { Rundown } from '@sofie-automation/corelib/dist/dataModel/Rundown'
 import { CorelibPubSub } from '@sofie-automation/corelib/dist/pubsub'
 import { withTranslation } from 'react-i18next'
@@ -28,7 +22,7 @@ import { MeteorPubSub } from '@sofie-automation/meteor-lib/dist/api/pubsub'
 import { UIStudio } from '@sofie-automation/meteor-lib/dist/api/studios'
 import { RundownPlaylistCollectionUtil } from '../../collections/rundownPlaylistUtil'
 import { firstIfArray } from '../../lib/lib'
-import { protectString, unprotectString } from '@sofie-automation/corelib/dist/protectedString'
+import { protectString } from '@sofie-automation/corelib/dist/protectedString'
 import { logger } from '../../lib/logging'
 import { RundownPlaylists, Rundowns } from '../../collections'
 import { documentTitle } from '../../lib/DocumentTitleProvider'
@@ -44,6 +38,8 @@ import { MeteorCall } from '../../lib/meteorApi'
 
 const DEFAULT_UPDATE_THROTTLE = 250 //ms
 const PIECE_MISSING_UPDATE_THROTTLE = 2000 //ms
+
+const PIECE_CONTINUATION_CLASS = 'continuation'
 
 interface PrompterConfig {
 	mirror?: boolean
@@ -327,11 +323,11 @@ export class PrompterViewContent extends React.Component<Translated<IProps & ITr
 
 	scrollToPartInstanceIfNotContinuation(partInstanceId: PartInstanceId): void {
 		const scrollMargin = this.calculateScrollPosition()
-		const target = document.querySelector<HTMLElement>(`[data-part-instance-id="${partInstanceId}"]`)
+		const target = document.querySelector<HTMLElement>(
+			`[data-part-instance-id="${partInstanceId}"]:not(:has(+ div.${PIECE_CONTINUATION_CLASS}))`
+		)
 
 		if (!target) return
-
-		if (target.dataset.containsPieceContinuation === 'true') return
 
 		const targetOffsetTop = target.getBoundingClientRect().top + window.pageYOffset
 		this.animateScrollTo(targetOffsetTop - scrollMargin)
@@ -662,6 +658,7 @@ interface ScrollAnchor {
 	/** offset to use to scroll the anchor. null means "just scroll the anchor into view, best effort" */
 	offset: number | null
 	anchorId: string
+	continuationOfId?: string
 }
 type PrompterSnapshot = ScrollAnchor[] | null
 
@@ -748,10 +745,9 @@ const PrompterContent = withTranslation()(
 		getScrollAnchors = (): ScrollAnchor[] => {
 			const readPosition = this.getReadPosition()
 
-			const useableTextAnchors: {
+			const useableTextAnchors: (ScrollAnchor & {
 				offset: number
-				anchorId: string
-			}[] = []
+			})[] = []
 			/** Maps anchorId -> offset */
 			const foundScrollAnchors: (ScrollAnchor & {
 				/** Positive number. How "good" the anchor is. The anchor with the lowest number will preferred later. */
@@ -773,29 +769,43 @@ const PrompterContent = withTranslation()(
 
 			// Gather anchors from any text blocks in view:
 
-			for (const textAnchor of document.querySelectorAll('.prompter .prompter-line:not(.empty)')) {
+			for (const textAnchor of document.querySelectorAll<HTMLElement>('.prompter .prompter-line:not(.empty)')) {
 				const { top, bottom } = textAnchor.getBoundingClientRect()
 
 				// Is the text block in view?
 				if (top <= readPosition && bottom > readPosition) {
-					useableTextAnchors.push({ anchorId: textAnchor.id, offset: top })
+					useableTextAnchors.push({
+						anchorId: textAnchor.id,
+						offset: top,
+						continuationOfId: textAnchor.dataset.liveContinuationOf,
+					})
 				}
 			}
 
 			// Also use scroll-anchors (Segment and Part names)
 
-			for (const scrollAnchor of document.querySelectorAll('.prompter .scroll-anchor')) {
+			for (const scrollAnchor of document.querySelectorAll<HTMLElement>('.prompter .scroll-anchor')) {
 				const { top, bottom } = scrollAnchor.getBoundingClientRect()
 
 				const distanceToReadPosition = Math.abs(top - readPosition)
 
 				if (top <= windowInnerHeight && bottom > 0) {
 					// If the anchor is in view, use the offset to keep it's position unchanged, relative to the viewport
-					foundScrollAnchors.push({ anchorId: scrollAnchor.id, distanceToReadPosition, offset: top })
+					foundScrollAnchors.push({
+						anchorId: scrollAnchor.id,
+						distanceToReadPosition,
+						offset: top,
+						continuationOfId: scrollAnchor.dataset.liveContinuationOf,
+					})
 				} else {
 					// If the anchor is not in view, set the offset to null, this will cause the view to
 					// jump so that the anchor will be in view.
-					foundScrollAnchors.push({ anchorId: scrollAnchor.id, distanceToReadPosition, offset: null })
+					foundScrollAnchors.push({
+						anchorId: scrollAnchor.id,
+						distanceToReadPosition,
+						offset: null,
+						continuationOfId: scrollAnchor.dataset.liveContinuationOf,
+					})
 				}
 			}
 
@@ -821,7 +831,19 @@ const PrompterContent = withTranslation()(
 
 			// Go through the anchors and use the first one that we find:
 			for (const scrollAnchor of scrollAnchors) {
-				const anchor = document.getElementById(scrollAnchor.anchorId)
+				// if there is a live continuation of this anchor (or anchor that this anchor continues), it should be prioritized over the actual anchor, which now likely is empty
+				let anchor = document.querySelector(
+					`[data-live-continuation-of="${scrollAnchor.continuationOfId || scrollAnchor.anchorId}"]`
+				)
+				// in case the anchor is already a continuation, but the script returned to its original part:
+				if (!anchor && scrollAnchor.continuationOfId) {
+					anchor = document.getElementById(scrollAnchor.continuationOfId)
+				}
+				// in case of a regular anchor:
+				if (!anchor && !scrollAnchor.continuationOfId) {
+					document.getElementById(scrollAnchor.anchorId)
+				}
+
 				if (!anchor) continue
 
 				const { top } = anchor.getBoundingClientRect()
@@ -987,7 +1009,7 @@ const PrompterContent = withTranslation()(
 						return
 					}
 
-					let partIdToHideScriptFor: PartId | undefined
+					let pieceIdToHideScript: PieceId | undefined
 					const partStatuses = segment.parts.map((part) => this.getPartStatus(prompterData, part))
 
 					lines.push(
@@ -1011,70 +1033,57 @@ const PrompterContent = withTranslation()(
 							firstPiece &&
 							firstPiece.continuationOf &&
 							partStatuses[i] === 'live' &&
+							firstPiece.startPartId &&
 							segment.parts.find((part) => part.id === firstPiece.startPartId)
 						) {
 							// the i-th part is live and has taken over the infinite script from the start part,
 							// therefore we need to hide the script from the start part
-							partIdToHideScriptFor = firstPiece.startPartId
+							pieceIdToHideScript = firstPiece.continuationOf
 							break
 						}
 					}
 
-					for (let i = 0; i < segment.parts.length; i++) {
-						const part = segment.parts[i]
-
-						let partElementId = unprotectString(part.id)
-
-						if (partIdToHideScriptFor === part.id) {
-							// this prevents id collision with the live part that contains the continuation, overriden in `else if` below
-							partElementId += '_hidden'
-						} else if (!!part.pieces[0]?.continuationOf && partStatuses[i] === 'live' && partIdToHideScriptFor) {
-							// the i-th part is live and has taken over the infinite script from the `partIdToHideScriptFor` part,
-							// therefore we need to use `partIdToHideScriptFor` as the id, so that `restoreScrollAnchor` thinks
-							// this is the same part where the intinite has started
-							partElementId = unprotectString(partIdToHideScriptFor)
-						}
-
+					for (const part of segment.parts) {
+						const partStatus = this.getPartStatus(prompterData, part)
+						const firstPiece = part.pieces[0]
+						const continuesFromPart = firstPiece?.continuationOf && firstPiece.startPartId
 						lines.push(
 							<div
-								id={`part_${partElementId}`}
+								id={`part_${part.id}`}
 								data-obj-id={segment.id + '_' + part.id}
 								data-part-instance-id={part.partInstanceId}
-								data-contains-piece-continuation={!!part.pieces[0]?.continuationOf}
+								data-live-continuation-of={
+									partStatus === 'live' && continuesFromPart ? `part_${continuesFromPart}` : undefined
+								}
 								key={'part_' + part.id}
-								className={ClassNames('prompter-part', 'scroll-anchor', partStatuses[i])}
+								className={ClassNames('prompter-part', 'scroll-anchor', partStatus)}
 							>
 								{part.title || 'N/A'}
 							</div>
 						)
 
 						for (const line of part.pieces) {
-							let pieceElementId = unprotectString(line.id)
-
-							if (partIdToHideScriptFor === part.id) {
-								// prevent id collision
-								pieceElementId += '_hidden'
-							} else if (partStatuses[i] === 'live' && line.continuationOf) {
-								// again we need to override the id, so that `restoreScrollAnchor` thinks this is the same piece
-								// that the infinite script started in
-								pieceElementId = unprotectString(line.continuationOf)
-							}
-
 							let text = line.text || ''
-
-							if ((line.continuationOf && partStatuses[i] !== 'live') || partIdToHideScriptFor === part.id) {
+							if (line.id === pieceIdToHideScript) {
+								text = ''
+							}
+							if (line.continuationOf && partStatus !== 'live') {
+								// if a continuation is not in a live part, it should not display its text
 								text = ''
 							}
 							lines.push(
 								<div
-									id={`line_${pieceElementId}`}
+									id={`line_${line.id}`}
 									data-obj-id={segment.id + '_' + part.id + '_' + line.id}
 									key={'line_' + part.id + '_' + segment.id + '_' + line.id}
-									className={ClassNames(
-										'prompter-line',
-										this.props.config.addBlankLine ? 'add-blank' : undefined,
-										!line.text ? 'empty' : undefined
-									)}
+									data-live-continuation-of={
+										partStatus === 'live' && line.continuationOf ? `line_${line.continuationOf}` : undefined
+									}
+									className={ClassNames('prompter-line', {
+										'add-blank': this.props.config.addBlankLine,
+										empty: !text,
+										[PIECE_CONTINUATION_CLASS]: line.continuationOf,
+									})}
 								>
 									{text}
 								</div>
