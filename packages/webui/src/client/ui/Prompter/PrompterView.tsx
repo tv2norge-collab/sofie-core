@@ -284,8 +284,7 @@ export class PrompterViewContent extends React.Component<Translated<IProps & ITr
 		if (playlist.currentPartInfo === null) return
 
 		// scrolls to a part instance, but only if it isn't showing a continuation of an infinite script piece
-		// those should not be scrolled to, because they are empty; it's the original part that holds the text
-		// and it should remain in view
+		// those should not be scrolled to, because they are handled by restoreScrollAnchor
 		this.scrollToPartInstanceIfNotContinuation(playlist.currentPartInfo.partInstanceId)
 	}
 	private calculateScrollPosition() {
@@ -841,7 +840,7 @@ const PrompterContent = withTranslation()(
 				}
 				// in case of a regular anchor:
 				if (!anchor && !scrollAnchor.continuationOfId) {
-					document.getElementById(scrollAnchor.anchorId)
+					anchor = document.getElementById(scrollAnchor.anchorId)
 				}
 
 				if (!anchor) continue
@@ -877,7 +876,7 @@ const PrompterContent = withTranslation()(
 			logger.error(
 				`Read anchor could not be found after update: ${scrollAnchors
 					.slice(0, 10)
-					.map((sa) => `"${sa.anchorId}" (${sa.offset})`)
+					.map((sa) => `"${sa.anchorId}" (offset: ${sa.offset}, continuationOfId: ${sa.continuationOfId})`)
 					.join(', ')}`
 			)
 
