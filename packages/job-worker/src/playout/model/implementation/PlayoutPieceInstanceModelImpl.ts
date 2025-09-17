@@ -137,7 +137,11 @@ export class PlayoutPieceInstanceModelImpl implements PlayoutPieceInstanceModel 
 			},
 			true
 		)
-		if (props.lifespan !== PieceLifespan.WithinPart && !this.PieceInstanceImpl.infinite) {
+		if (
+			props.lifespan !== undefined &&
+			props.lifespan !== PieceLifespan.WithinPart &&
+			!this.PieceInstanceImpl.infinite
+		) {
 			setupPieceInstanceInfiniteProperties(this.PieceInstanceImpl)
 			this.PieceInstanceImpl.dynamicallyConvertedToInfinite = getCurrentTime()
 		}
