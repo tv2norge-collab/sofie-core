@@ -160,7 +160,7 @@ export class CoreHandler {
 
 			versions: getVersions(this.logger),
 
-			documentationUrl: 'https://github.com/nrkno/sofie-core',
+			documentationUrl: 'https://github.com/Sofie-Automation/sofie-core',
 		}
 
 		if (!options.deviceToken) {
@@ -228,7 +228,7 @@ export class CoreHandler {
 					this.logger.error(`executeFunction error: ${errStr}`)
 				}
 				fcnObject.core.coreMethods.functionReply(cmd._id, errStr, res).catch((error: any) => {
-					this.logger.error(error)
+					this.logger.error(stringifyError(error))
 				})
 			}
 

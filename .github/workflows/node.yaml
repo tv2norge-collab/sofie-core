@@ -21,11 +21,11 @@ jobs:
       packages: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: ".node-version"
       - uses: ./.github/actions/setup-meteor
@@ -71,11 +71,11 @@ jobs:
       packages: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: ".node-version"
       - uses: ./.github/actions/setup-meteor
@@ -277,7 +277,7 @@ jobs:
         gateway-name: [playout-gateway, mos-gateway, "live-status-gateway"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Determine if images should be published to ecr
@@ -422,11 +422,11 @@ jobs:
           - live-status-gateway
           - webui
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: ".node-version"
       - name: restore node_modules
@@ -458,7 +458,7 @@ jobs:
           CI: true
 
   test-packages:
-    name: Test Package
+    name: Test Package (main)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -498,11 +498,11 @@ jobs:
             send-coverage: true
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
       - name: restore node_modules
@@ -533,8 +533,8 @@ jobs:
         env:
           CI: true
       - name: Send coverage
-        if: (matrix.node-version == '18.x' || matrix.send-coverage == true) && ((github.event_name == 'pull_request') && ((!startsWith(github.head_ref, 'release'))) || ((github.event_name == 'push') && (!startsWith(github.ref_name, 'release'))))
-        uses: codecov/codecov-action@v4
+        if: (matrix.node-version == '22.x' || matrix.send-coverage == true) && (((github.event_name == 'pull_request') && (!startsWith(github.head_ref, 'release'))) || ((github.event_name == 'push') && (!startsWith(github.ref_name, 'release'))))
+        uses: codecov/codecov-action@v5
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   asyncapi-generation:
@@ -544,11 +544,11 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: ".node-version"
       - uses: ./.github/actions/codeartifact-login
@@ -579,11 +579,11 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: ".node-version"
       - uses: ./.github/actions/codeartifact-login
@@ -622,11 +622,11 @@ jobs:
       packages: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: ".node-version"
       - name: restore node_modules
@@ -664,7 +664,7 @@ jobs:
         env:
           CI: true
       - name: Publish
-        if: github.ref == 'refs/heads/master' # always publish for just the master branch
+        if: github.ref == 'refs/heads/main' # always publish for just the main branch
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -770,11 +770,11 @@ jobs:
       packages: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: ".node-version"
       - uses: ./.github/actions/setup-meteor

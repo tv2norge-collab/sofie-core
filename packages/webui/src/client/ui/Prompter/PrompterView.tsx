@@ -10,6 +10,7 @@ import {
 	Translated,
 	useGlobalDelayedTrackerUpdateState,
 	useSubscription,
+	useSubscriptionIfEnabled,
 	useSubscriptions,
 	useTracker,
 } from '../../lib/ReactMeteorData/ReactMeteorData'
@@ -703,11 +704,11 @@ function Prompter(props: Readonly<PropsWithChildren<IPrompterProps>>): JSX.Eleme
 		[props.rundownPlaylistId]
 	)
 	const rundownIDs = playlist ? RundownPlaylistCollectionUtil.getRundownUnorderedIDs(playlist) : []
-	useSubscription(CorelibPubSub.segments, rundownIDs, {})
+	useSubscriptionIfEnabled(CorelibPubSub.segments, rundownIDs.length > 0, rundownIDs, {})
 	useSubscription(MeteorPubSub.uiParts, props.rundownPlaylistId)
-	useSubscription(MeteorPubSub.uiPartInstances, playlist?.activationId ?? null)
-	useSubscription(CorelibPubSub.pieces, rundownIDs, null)
-	useSubscription(CorelibPubSub.pieceInstancesSimple, rundownIDs, null)
+	useSubscriptionIfEnabled(MeteorPubSub.uiPartInstances, !!playlist?.activationId, playlist?.activationId ?? null)
+	useSubscriptionIfEnabled(CorelibPubSub.pieces, rundownIDs.length > 0, rundownIDs, null)
+	useSubscriptionIfEnabled(CorelibPubSub.pieceInstancesSimple, rundownIDs.length > 0, rundownIDs, null)
 
 	const rundowns = useTracker(
 		() =>
@@ -1134,7 +1135,7 @@ const PrompterContent = withTranslation()(
 
 			if (hasInsertedScript) {
 				lines.push(
-					<div className="prompter-break end" key="prompter_break">
+					<div key="end-of-script" className="prompter-break end">
 						—{t('End of script')}—
 					</div>
 				)
@@ -1192,18 +1193,18 @@ const PrompterContent = withTranslation()(
 								this.props.config.marker === 'center'
 									? '50vh'
 									: this.props.config.marker === 'bottom'
-									? '100vh'
-									: this.props.config.margin
-									? this.props.config.margin + 'vh'
-									: undefined,
+										? '100vh'
+										: this.props.config.margin
+											? this.props.config.margin + 'vh'
+											: undefined,
 							paddingBottom:
 								this.props.config.marker === 'center'
 									? '50vh'
 									: this.props.config.marker === 'top'
-									? '100vh'
-									: this.props.config.margin
-									? this.props.config.margin + 'vh'
-									: undefined,
+										? '100vh'
+										: this.props.config.margin
+											? this.props.config.margin + 'vh'
+											: undefined,
 						}}
 					>
 						<div className="prompter-break begin">{this.props.prompterData.title}</div>

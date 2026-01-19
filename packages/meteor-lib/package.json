@@ -1,6 +1,6 @@
 {
 	"name": "@sofie-automation/meteor-lib",
-	"version": "1.52.0-in-testing.0",
+	"version": "1.52.0",
 	"private": true,
 	"description": "Temporary internal library for some types shared by meteor and webui",
 	"main": "dist/index.js",
@@ -14,7 +14,7 @@
 	"bugs": {
 		"url": "https://github.com/nrkno/sofie-core/issues"
 	},
-	"homepage": "https://github.com/nrkno/sofie-core/blob/master/packages/corelib#readme",
+	"homepage": "https://github.com/nrkno/sofie-core/blob/main/packages/corelib#readme",
 	"scripts": {
 		"build": "run -T rimraf dist && run build:main",
 		"build:main": "run -T tsc -p tsconfig.build.json",
@@ -39,10 +39,10 @@
 		"/LICENSE"
 	],
 	"dependencies": {
-		"@mos-connection/helper": "^4.2.2",
-		"@sofie-automation/blueprints-integration": "1.52.0-in-testing.0",
-		"@sofie-automation/corelib": "1.52.0-in-testing.0",
-		"@sofie-automation/shared-lib": "1.52.0-in-testing.0",
+		"@mos-connection/helper": "^4.3.1",
+		"@sofie-automation/blueprints-integration": "1.52.0",
+		"@sofie-automation/corelib": "1.52.0",
+		"@sofie-automation/shared-lib": "1.52.0",
 		"deep-extend": "0.6.0",
 		"semver": "^7.6.3",
 		"type-fest": "^4.33.0",
@@ -66,5 +66,5 @@
 			"yarn lint:raw"
 		]
 	},
-	"packageManager": "yarn@4.6.0"
+	"packageManager": "yarn@4.10.3"
 }
