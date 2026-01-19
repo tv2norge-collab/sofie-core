@@ -274,7 +274,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        gateway-name: [playout-gateway, "live-status-gateway"]
+        gateway-name: [playout-gateway, mos-gateway, "live-status-gateway"]
 
     steps:
       - uses: actions/checkout@v4
