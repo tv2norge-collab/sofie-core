@@ -516,21 +516,6 @@ export class MosHandler {
 
 			const machInfo = await getMachineInfoUntilConnected()
 			this._logger.info('Connected to Mos-device', machInfo)
-			const machineId: string | undefined = machInfo.ID && this.mosTypes.mosString128.stringify(machInfo.ID)
-			if (
-				!(
-					machineId === deviceOptions.primary.id ||
-					(deviceOptions.secondary && machineId === deviceOptions.secondary.id)
-				)
-			) {
-				throw new Error(
-					'Mos-device has ID "' +
-						machineId +
-						'" but specified ncs-id is "' +
-						(deviceOptions.primary.id || (deviceOptions.secondary || { id: '' }).id) +
-						'"'
-				)
-			}
 			return mosDevice
 		} catch (e) {
 			// something went wrong during init:
