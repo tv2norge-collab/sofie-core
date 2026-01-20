@@ -256,15 +256,46 @@ export class MosHandler {
 
 				this.allMosDevices[mosDevice.idPrimary].coreMosHandler = coreMosHandler
 
+				let hasSentInit = false
+				const sendInit = async () => {
+					try {
+						this._logger.info('Requesting rundown list from NRCS...')
+						const roList = await mosDevice.sendRequestAllRunningOrders()
+						this.debugLog('List of all rundowns from NRCS', { roList: JSON.stringify(roList) })
+
+						if (roList && roList.length > 0) {
+							const firstROBase = roList[0]
+							this._logger.info('Requesting full rundown: ' + firstROBase.ID)
+							const fullRO = await mosDevice.sendRequestRunningOrder(firstROBase.ID)
+							if (fullRO) {
+								await coreMosHandler.mosRoReplace(fullRO)
+							}
+						}
+					} catch (e) {
+						this._logger.error('Error during initial NRCS rundown request: ' + stringifyError(e))
+					}
+				}
+
 				// Initial Status check:
 				const connectionStatus = mosDevice.getConnectionStatus()
 				coreMosHandler.onMosConnectionChanged(connectionStatus) // initial check
+
+				const triggerSendInitIfConnected = (status: IMOSConnectionStatus) => {
+					if (!hasSentInit && (status.PrimaryConnected || status.SecondaryConnected)) {
+						hasSentInit = true
+						sendInit().catch((e) => {
+							this._logger.error('Error in sendInit: ' + stringifyError(e))
+						})
+					}
+				}
+
 				// Profile 0: -------------------------------------------------
 				mosDevice.onConnectionChange((newStatus: IMOSConnectionStatus) => {
 					//  MOSDevice >>>> Core
 					coreMosHandler.onMosConnectionChanged(newStatus)
+					triggerSendInitIfConnected(newStatus)
 				})
-				coreMosHandler.onMosConnectionChanged(mosDevice.getConnectionStatus())
+				triggerSendInitIfConnected(connectionStatus)
 				mosDevice.onRequestMachineInfo(async () => {
 					// MOSDevice >>>> Core
 					return coreMosHandler.getMachineInfo()
@@ -364,13 +395,6 @@ export class MosHandler {
 					// MOSDevice >>>> Core
 					return this._getROAck(Action.ID, coreMosHandler.mosRoReadyToAir(Action))
 				})
-				// ----------------------------------------------------------------
-				// Init actions
-				/*
-					mosDevice.getMachineInfo()
-						.then((machineInfo: IMOSListMachInfo) => {
-						})
-					*/
 				// Profile 3: -------------------------------------------------
 				// Profile 4: -------------------------------------------------
 				// onStory: (cb: (story: IMOSROFullStory) => Promise<any>) => void
