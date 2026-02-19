@@ -1055,11 +1055,22 @@ describe('Resolved Pieces', () => {
 			] satisfies StrippedResult)
 		})
 
-		test('previousPart pieces are extended by previousPartKeepaliveDuration', async () => {
-			const sourceLayerId = Object.keys(sourceLayers)[0]
-			expect(sourceLayerId).toBeTruthy()
+		test('previousPart AB-session pieces are open-ended during previousPartKeepaliveDuration', async () => {
+			const sourceLayerIds = Object.keys(sourceLayers)
+			expect(sourceLayerIds.length).toBeGreaterThanOrEqual(4)
+			// Use TRANSITION (index 2) and GRAPHICS (index 3) — these have no exclusiveGroup,
+			// so they won't compete and get pruned out by processAndPrunePieceInstanceTimings.
+			const sourceLayerId = sourceLayerIds[2] // TRANSITION — no exclusiveGroup
+			const sourceLayerId2 = sourceLayerIds[3] // GRAPHICS — no exclusiveGroup
 
-			const previousPiece = createPieceInstance(sourceLayerId, { start: 0 })
+			// A clip piece with abSessions (e.g. a video clip assigned to an AB player).
+			// This simulates LierHansen playing on player_a (input=6) during a stinger transition.
+			const previousAbPiece = createPieceInstance(sourceLayerId, { start: 0, duration: 10000 })
+			previousAbPiece.piece.abSessions = [{ sessionName: 'clip', poolName: 'clip' }]
+
+			// A non-AB piece in the same previous part (e.g. audio, graphics)
+			const previousNonAbPiece = createPieceInstance(sourceLayerId2, { start: 0, duration: 10000 })
+
 			const currentPiece = createPieceInstance(sourceLayerId, { start: 0 })
 
 			const now = 990000
@@ -1072,7 +1083,7 @@ describe('Resolved Pieces', () => {
 				previousPartStarted,
 				nowInPart + 5000,
 				createPartInstance(),
-				[previousPiece]
+				[previousAbPiece, previousNonAbPiece]
 			)
 
 			// Current part has a stinger inTransition with previousPartKeepaliveDuration
@@ -1098,14 +1109,21 @@ describe('Resolved Pieces', () => {
 				now
 			)
 
-			// The previous part's piece should be extended beyond currentPartStarted
-			// by keepaliveDuration, so the AB resolver does not reassign its player
-			// to a lookahead while the keepalive is still holding the clip.
+			// Pieces WITH abSessions: resolvedDuration must be undefined so the AB resolver's
+			// assignPlayersForLookahead excludes this player from lastSessionPerSlot. This prevents
+			// a future lookahead from being placed on the previous player (e.g. player_a / input=6)
+			// before the stinger cut point, which would fire LIST_REMOVE_ALL causing a black frame.
+			// Pieces WITHOUT abSessions: natural duration is preserved (starts are still offset correctly).
 			expect(stripResult(resolvedPieces)).toEqual([
 				{
-					_id: previousPiece._id,
+					_id: previousAbPiece._id,
 					resolvedStart: previousPartStarted,
-					resolvedDuration: 5000 + keepaliveDuration,
+					resolvedDuration: undefined, // cleared — AB resolver ignores this player for lookahead
+				},
+				{
+					_id: previousNonAbPiece._id,
+					resolvedStart: previousPartStarted,
+					resolvedDuration: 10000, // natural duration preserved, no artificial cap
 				},
 				{
 					_id: currentPiece._id,

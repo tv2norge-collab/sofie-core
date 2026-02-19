@@ -9,6 +9,7 @@ import {
 } from '@sofie-automation/corelib/dist/playout/processAndPrune'
 import { SelectedPartInstancesTimelineInfo } from './timeline/generate'
 import { PlayoutPartInstanceModel } from './model/PlayoutPartInstanceModel'
+import { logger } from '../logging'
 
 /**
  * Resolve the PieceInstances for a PartInstance
@@ -83,20 +84,40 @@ export function getResolvedPiecesForPartInstancesOnTimeline(
 			resolvePrunedPieceInstance(nowInPart, instance)
 		)
 
-		// If the current part has a previousPartKeepaliveDuration (e.g. a stinger transition), the
-		// blueprint's onTimelineGenerate will hold the previous part's clip timeline objects alive
-		// for that duration. Extend the AB session end cap to match, so the resolver does not
-		// reassign the previous player to a lookahead before the keepalive expires.
 		const previousPartKeepaliveDuration =
 			partInstancesInfo.current.partInstance.part.inTransition?.previousPartKeepaliveDuration ?? 0
-		const previousPartEndCap = currentPartStarted + previousPartKeepaliveDuration
 
-		// Translate start to absolute times
-		offsetResolvedStartAndCapDuration(
-			previousResolvedPieces,
-			partInstancesInfo.previous.partStarted,
-			previousPartEndCap
-		)
+		if (previousPartKeepaliveDuration > 0) {
+			// During a stinger/wipe transition, the blueprint's onTimelineGenerate holds the
+			// previous part's clip alive for keepaliveDuration ms via a keepalive timeline object.
+			// The clip piece's session naturally ends at T+0ms (when the new part becomes current),
+			// which makes the player appear "clear now" to the AB resolver (safeNow = now + nowWindow).
+			// Extending the session end cap doesn't help because the clip already ends at T, so
+			// Math.min(clipDuration, cap) = clipDuration — the cap is a no-op.
+			// Instead, mark AB-session pieces as open-ended (resolvedDuration = undefined).
+			// An open-ended session is excluded from lastSessionPerSlot in assignPlayersForLookahead,
+			// so no future lookahead gets placed on the previous player during the stinger/keepalive window.
+			// Translate start to absolute times (no end cap)
+			logger.debug(
+				`[AB_KEEPALIVE] previousPartKeepaliveDuration=${previousPartKeepaliveDuration} — marking AB-session pieces as open-ended to block lookahead assignment`
+			)
+			offsetResolvedStartAndCapDuration(previousResolvedPieces, partInstancesInfo.previous.partStarted, null)
+			for (const piece of previousResolvedPieces) {
+				if (piece.instance.piece.abSessions?.length) {
+					logger.debug(
+						`[AB_KEEPALIVE] open-ending piece "${piece.instance._id}" (was resolvedDuration=${piece.resolvedDuration}) to exclude from lastSessionPerSlot`
+					)
+					delete piece.resolvedDuration
+				}
+			}
+		} else {
+			// Translate start to absolute times, capped at when the current part started
+			offsetResolvedStartAndCapDuration(
+				previousResolvedPieces,
+				partInstancesInfo.previous.partStarted,
+				currentPartStarted
+			)
+		}
 	}
 
 	return mergeInfinitesIntoCurrentPart(previousResolvedPieces, currentResolvedPieces, nextResolvedPieces)
