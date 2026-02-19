@@ -42,6 +42,26 @@ export function applyAbPlayerObjectAssignments(
 		}
 		newAssignments[sessionId] = { sessionId, playerId, lookahead }
 	}
+	const disableUnassignedLookaheadObjects = (
+		sessionId: string,
+		reason: 'missing-player' | 'unexpected-session',
+		objs: OnGenerateTimelineObjExt[]
+	): void => {
+		const lookaheadsToDisable = objs.filter((obj) => !!obj.isLookahead && !obj.disabled)
+		if (!lookaheadsToDisable.length) return
+
+		for (const obj of lookaheadsToDisable) {
+			obj.disabled = true
+		}
+
+		logger.debug(
+			`[AB_LOOKAHEAD_GUARD] disabled=${
+				lookaheadsToDisable.length
+			} session="${poolName}"-"${sessionId}" reason=${reason} ids=${lookaheadsToDisable
+				.map((obj) => obj.id)
+				.join(',')}`
+		)
+	}
 
 	// collect objects by their sessionId
 	const groupedObjectsMap = new Map<string, Array<OnGenerateTimelineObjExt>>()
@@ -81,7 +101,9 @@ export function applyAbPlayerObjectAssignments(
 				)
 				persistAssignment(sessionId, matchingAssignment.playerId, !!matchingAssignment.lookaheadRank)
 			} else {
-				// A warning will already have been raised about this having no player
+				// A warning will already have been raised about this having no player.
+				// Guard against unassigned lookaheads accidentally driving pending/default layers.
+				disableUnassignedLookaheadObjects(sessionId, 'missing-player', objs)
 			}
 		} else {
 			// This is a group that shouldn't exist, so are likely a bug. There isnt a lot we can do beyond warn about the issue
@@ -94,6 +116,9 @@ export function applyAbPlayerObjectAssignments(
 					...updateObjectsToAbPlayer(blueprintContext, abConfiguration, poolName, prev.playerId, objs)
 				)
 				persistAssignment(sessionId, prev.playerId, false)
+			} else {
+				// If we can't map this session at all, make sure any lookahead objects stay inert.
+				disableUnassignedLookaheadObjects(sessionId, 'unexpected-session', objs)
 			}
 		}
 	}

@@ -6,6 +6,7 @@ import { protectString } from '@sofie-automation/corelib/dist/protectedString'
 import { CommonContext } from '../../../blueprints/context'
 import { AbSessionHelper } from '../abSessionHelper'
 import { applyAbPlayerObjectAssignments } from '../applyAssignments'
+import { SessionRequest } from '../abPlaybackResolver'
 
 const POOL_NAME = 'clip'
 
@@ -143,6 +144,108 @@ describe('applyMediaPlayersAssignments', () => {
 				lookahead: false,
 			},
 		})
+	})
+
+	test('disables lookahead object when resolver has no player for the session', () => {
+		const pieceInstanceId = 'piece0'
+		const partInstanceId = protectString('part0')
+		const sessionId = 'piece0_clip_abc'
+
+		mockGetObjectSessionId.mockReturnValue(sessionId)
+
+		const objects = [
+			literal<OnGenerateTimelineObjExt>({
+				id: 'lookahead_0',
+				layer: 'vmix_clip_player_pending',
+				enable: {
+					while: '1',
+				},
+				content: {
+					deviceType: TSR.DeviceType.ABSTRACT,
+				},
+				isLookahead: true,
+				disabled: false,
+				abSessions: [
+					{
+						sessionName: 'abc',
+						poolName: POOL_NAME,
+					},
+				],
+				metaData: null,
+				pieceInstanceId,
+				partInstanceId,
+				priority: 0.1,
+			}),
+		]
+
+		const resolvedAssignments: Readonly<SessionRequest[]> = [
+			{
+				id: sessionId,
+				start: Number.MAX_SAFE_INTEGER,
+				end: undefined,
+				lookaheadRank: 1,
+				playerId: undefined,
+			},
+		]
+
+		const res = applyAbPlayerObjectAssignments(
+			abSessionHelper,
+			context,
+			abConfiguration,
+			objects,
+			{},
+			resolvedAssignments,
+			POOL_NAME
+		)
+
+		expect(res).toEqual({})
+		expect(objects[0].disabled).toBe(true)
+	})
+
+	test('disables unexpected lookahead object when there is no fallback assignment', () => {
+		const pieceInstanceId = 'piece0'
+		const partInstanceId = protectString('part0')
+		const sessionId = 'piece0_clip_abc'
+
+		mockGetObjectSessionId.mockReturnValue(sessionId)
+
+		const objects = [
+			literal<OnGenerateTimelineObjExt>({
+				id: 'lookahead_0',
+				layer: 'vmix_clip_player_pending',
+				enable: {
+					while: '1',
+				},
+				content: {
+					deviceType: TSR.DeviceType.ABSTRACT,
+				},
+				isLookahead: true,
+				disabled: false,
+				abSessions: [
+					{
+						sessionName: 'abc',
+						poolName: POOL_NAME,
+					},
+				],
+				metaData: null,
+				pieceInstanceId,
+				partInstanceId,
+				priority: 0.1,
+			}),
+		]
+
+		const res = applyAbPlayerObjectAssignments(
+			abSessionHelper,
+			context,
+			abConfiguration,
+			objects,
+			{},
+			[],
+			POOL_NAME
+		)
+
+		expect(res).toEqual({})
+		expect(objects[0].disabled).toBe(true)
 	})
 
 	// TODO - more tests
