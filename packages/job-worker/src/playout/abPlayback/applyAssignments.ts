@@ -44,7 +44,7 @@ export function applyAbPlayerObjectAssignments(
 	}
 	const disableUnassignedLookaheadObjects = (
 		sessionId: string,
-		reason: 'missing-player' | 'unexpected-session',
+		reason: 'missing-player' | 'unexpected-session' | 'open-ended-active',
 		objs: OnGenerateTimelineObjExt[]
 	): void => {
 		const lookaheadsToDisable = objs.filter((obj) => !!obj.isLookahead && !obj.disabled)
@@ -62,6 +62,9 @@ export function applyAbPlayerObjectAssignments(
 				.join(',')}`
 		)
 	}
+	const hasOpenEndedActiveSession = resolvedAssignments.some(
+		(req) => req.lookaheadRank === undefined && req.end === undefined
+	)
 
 	// collect objects by their sessionId
 	const groupedObjectsMap = new Map<string, Array<OnGenerateTimelineObjExt>>()
@@ -85,6 +88,12 @@ export function applyAbPlayerObjectAssignments(
 	// Apply the known assignments
 	for (const [sessionId, objs] of groupedObjectsMap.entries()) {
 		if (sessionId === 'undefined') continue
+		if (hasOpenEndedActiveSession) {
+			// While any regular session in this pool is open-ended, keep all lookahead objects inert.
+			// This avoids lookahead list-sync operations reclaiming the outgoing player during stinger/keepalive.
+			disableUnassignedLookaheadObjects(sessionId, 'open-ended-active', objs)
+		}
+		const objsToAssign = objs.filter((obj) => !obj.isLookahead)
 
 		const matchingAssignment = resolvedAssignments.find((req) => req.id === sessionId)
 
@@ -96,7 +105,7 @@ export function applyAbPlayerObjectAssignments(
 						abConfiguration,
 						poolName,
 						matchingAssignment.playerId,
-						objs
+						objsToAssign
 					)
 				)
 				persistAssignment(sessionId, matchingAssignment.playerId, !!matchingAssignment.lookaheadRank)
@@ -113,7 +122,7 @@ export function applyAbPlayerObjectAssignments(
 			const prev = previousAssignmentMap?.[sessionId]
 			if (prev) {
 				failedObjects.push(
-					...updateObjectsToAbPlayer(blueprintContext, abConfiguration, poolName, prev.playerId, objs)
+					...updateObjectsToAbPlayer(blueprintContext, abConfiguration, poolName, prev.playerId, objsToAssign)
 				)
 				persistAssignment(sessionId, prev.playerId, false)
 			} else {
