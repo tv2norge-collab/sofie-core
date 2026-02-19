@@ -6095,7 +6095,7 @@ __metadata:
   resolution: "@sofie-automation/shared-lib@workspace:shared-lib"
   dependencies:
     "@mos-connection/model": "npm:^4.2.2"
-    timeline-state-resolver-types: "npm:9.3.0-nightly-EAV-Stinger-20260219-173601-0fbce20c.0"
+    timeline-state-resolver-types: "npm:9.3.0-nightly-EAV-Stinger-20260219-195213-e61bfa17.0"
     tslib: "npm:^2.8.1"
     type-fest: "npm:^4.33.0"
   languageName: unknown
@@ -23073,7 +23073,7 @@ asn1@evs-broadcast/node-asn1:
     "@sofie-automation/shared-lib": "npm:1.52.0-in-testing.0"
     debug: "npm:^4.4.0"
     influx: "npm:^5.9.7"
-    timeline-state-resolver: "npm:9.3.0-nightly-EAV-Stinger-20260219-173601-0fbce20c.0"
+    timeline-state-resolver: "npm:9.3.0-nightly-EAV-Stinger-20260219-195213-e61bfa17.0"
     tslib: "npm:^2.8.1"
     underscore: "npm:^1.13.7"
     winston: "npm:^3.17.0"
@@ -27799,18 +27799,18 @@ asn1@evs-broadcast/node-asn1:
   languageName: node
   linkType: hard
 
-"timeline-state-resolver-types@npm:9.3.0-nightly-EAV-Stinger-20260219-173601-0fbce20c.0":
-  version: 9.3.0-nightly-EAV-Stinger-20260219-173601-0fbce20c.0
-  resolution: "timeline-state-resolver-types@npm:9.3.0-nightly-EAV-Stinger-20260219-173601-0fbce20c.0"
+"timeline-state-resolver-types@npm:9.3.0-nightly-EAV-Stinger-20260219-195213-e61bfa17.0":
+  version: 9.3.0-nightly-EAV-Stinger-20260219-195213-e61bfa17.0
+  resolution: "timeline-state-resolver-types@npm:9.3.0-nightly-EAV-Stinger-20260219-195213-e61bfa17.0"
   dependencies:
     tslib: "npm:^2.6.3"
-  checksum: 10/a1f1fcc25fa53cd080a86f26ab488977545be6c03da10711b9075a3775cbb66c377dd5c9e4491faad8264ccb639986060f9495737417804206f5c974e9736a54
+  checksum: 10/4b247d8576e581718fae9761b1a51123ce67655eaf04dba694e4c4762c034b84907de914ad253621097a1b01c7d41f001f22f87f50dc7828d43ce766f0502574
   languageName: node
   linkType: hard
 
-"timeline-state-resolver@npm:9.3.0-nightly-EAV-Stinger-20260219-173601-0fbce20c.0":
-  version: 9.3.0-nightly-EAV-Stinger-20260219-173601-0fbce20c.0
-  resolution: "timeline-state-resolver@npm:9.3.0-nightly-EAV-Stinger-20260219-173601-0fbce20c.0"
+"timeline-state-resolver@npm:9.3.0-nightly-EAV-Stinger-20260219-195213-e61bfa17.0":
+  version: 9.3.0-nightly-EAV-Stinger-20260219-195213-e61bfa17.0
+  resolution: "timeline-state-resolver@npm:9.3.0-nightly-EAV-Stinger-20260219-195213-e61bfa17.0"
   dependencies:
     "@tv2media/v-connection": "npm:^7.3.4"
     atem-connection: "npm:3.5.0"
@@ -27835,7 +27835,7 @@ asn1@evs-broadcast/node-asn1:
     sprintf-js: "npm:^1.1.3"
     superfly-timeline: "npm:^9.1.2"
     threadedclass: "npm:^1.2.2"
-    timeline-state-resolver-types: "npm:9.3.0-nightly-EAV-Stinger-20260219-173601-0fbce20c.0"
+    timeline-state-resolver-types: "npm:9.3.0-nightly-EAV-Stinger-20260219-195213-e61bfa17.0"
     tslib: "npm:^2.6.3"
     tv-automation-quantel-gateway-client: "npm:^3.1.7"
     type-fest: "npm:^3.13.1"
@@ -27843,7 +27843,7 @@ asn1@evs-broadcast/node-asn1:
     utf-8-validate: "npm:^6.0.4"
     ws: "npm:^8.18.0"
     xml-js: "npm:^1.6.11"
-  checksum: 10/991a3774cfb2d57eee3b1144bb82a9144e04ec4dd0f3eb320e6a52f4b4becb18d3ac6d41ab50db9af971a505288407ab6bb24936063d08c398995930627a1eb7
+  checksum: 10/d247989aba54ceea5b45ae3388a9dd0f03d787641f9a96f719afa717b2b792fd72dee9d372e85cd458da3f76d250b9fb918e732903cc287d0b5b31744a119688
   languageName: node
   linkType: hard
 
