@@ -370,7 +370,7 @@ describe('Resolved Pieces', () => {
 
 	describe('getResolvedPiecesForPartInstancesOnTimeline', () => {
 		function createPartInstance(
-			partProps?: Partial<Pick<DBPart, 'autoNext' | 'expectedDuration'>>
+			partProps?: Partial<Pick<DBPart, 'autoNext' | 'expectedDuration' | 'inTransition'>>
 		): DBPartInstance {
 			return {
 				_id: getRandomId(),
@@ -1050,6 +1050,66 @@ describe('Resolved Pieces', () => {
 				{
 					_id: piece010._id,
 					resolvedStart: nextPartStart,
+					resolvedDuration: undefined,
+				},
+			] satisfies StrippedResult)
+		})
+
+		test('previousPart pieces are extended by previousPartKeepaliveDuration', async () => {
+			const sourceLayerId = Object.keys(sourceLayers)[0]
+			expect(sourceLayerId).toBeTruthy()
+
+			const previousPiece = createPieceInstance(sourceLayerId, { start: 0 })
+			const currentPiece = createPieceInstance(sourceLayerId, { start: 0 })
+
+			const now = 990000
+			const nowInPart = 2000
+			const currentPartStarted = now - nowInPart
+			const previousPartStarted = currentPartStarted - 5000
+			const keepaliveDuration = 1020
+
+			const previousPartInfo = createPartInstanceInfo(
+				previousPartStarted,
+				nowInPart + 5000,
+				createPartInstance(),
+				[previousPiece]
+			)
+
+			// Current part has a stinger inTransition with previousPartKeepaliveDuration
+			const currentPartInfo = createPartInstanceInfo(
+				currentPartStarted,
+				nowInPart,
+				createPartInstance({
+					inTransition: {
+						blockTakeDuration: 0,
+						previousPartKeepaliveDuration: keepaliveDuration,
+						partContentDelayDuration: 0,
+					},
+				}),
+				[currentPiece]
+			)
+
+			const resolvedPieces = getResolvedPiecesForPartInstancesOnTimeline(
+				context,
+				{
+					current: currentPartInfo,
+					previous: previousPartInfo,
+				},
+				now
+			)
+
+			// The previous part's piece should be extended beyond currentPartStarted
+			// by keepaliveDuration, so the AB resolver does not reassign its player
+			// to a lookahead while the keepalive is still holding the clip.
+			expect(stripResult(resolvedPieces)).toEqual([
+				{
+					_id: previousPiece._id,
+					resolvedStart: previousPartStarted,
+					resolvedDuration: 5000 + keepaliveDuration,
+				},
+				{
+					_id: currentPiece._id,
+					resolvedStart: currentPartStarted,
 					resolvedDuration: undefined,
 				},
 			] satisfies StrippedResult)

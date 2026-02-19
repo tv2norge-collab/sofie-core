@@ -83,11 +83,19 @@ export function getResolvedPiecesForPartInstancesOnTimeline(
 			resolvePrunedPieceInstance(nowInPart, instance)
 		)
 
+		// If the current part has a previousPartKeepaliveDuration (e.g. a stinger transition), the
+		// blueprint's onTimelineGenerate will hold the previous part's clip timeline objects alive
+		// for that duration. Extend the AB session end cap to match, so the resolver does not
+		// reassign the previous player to a lookahead before the keepalive expires.
+		const previousPartKeepaliveDuration =
+			partInstancesInfo.current.partInstance.part.inTransition?.previousPartKeepaliveDuration ?? 0
+		const previousPartEndCap = currentPartStarted + previousPartKeepaliveDuration
+
 		// Translate start to absolute times
 		offsetResolvedStartAndCapDuration(
 			previousResolvedPieces,
 			partInstancesInfo.previous.partStarted,
-			currentPartStarted
+			previousPartEndCap
 		)
 	}
 
