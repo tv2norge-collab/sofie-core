@@ -370,7 +370,7 @@ describe('Resolved Pieces', () => {
 
 	describe('getResolvedPiecesForPartInstancesOnTimeline', () => {
 		function createPartInstance(
-			partProps?: Partial<Pick<DBPart, 'autoNext' | 'expectedDuration' | 'inTransition'>>
+			partProps?: Partial<Pick<DBPart, 'autoNext' | 'expectedDuration'>>
 		): DBPartInstance {
 			return {
 				_id: getRandomId(),
@@ -1050,84 +1050,6 @@ describe('Resolved Pieces', () => {
 				{
 					_id: piece010._id,
 					resolvedStart: nextPartStart,
-					resolvedDuration: undefined,
-				},
-			] satisfies StrippedResult)
-		})
-
-		test('previousPart AB-session pieces are open-ended during previousPartKeepaliveDuration', async () => {
-			const sourceLayerIds = Object.keys(sourceLayers)
-			expect(sourceLayerIds.length).toBeGreaterThanOrEqual(4)
-			// Use TRANSITION (index 2) and GRAPHICS (index 3) — these have no exclusiveGroup,
-			// so they won't compete and get pruned out by processAndPrunePieceInstanceTimings.
-			const sourceLayerId = sourceLayerIds[2] // TRANSITION — no exclusiveGroup
-			const sourceLayerId2 = sourceLayerIds[3] // GRAPHICS — no exclusiveGroup
-
-			// A clip piece with abSessions (e.g. a video clip assigned to an AB player).
-			// This simulates LierHansen playing on player_a (input=6) during a stinger transition.
-			const previousAbPiece = createPieceInstance(sourceLayerId, { start: 0, duration: 10000 })
-			previousAbPiece.piece.abSessions = [{ sessionName: 'clip', poolName: 'clip' }]
-
-			// A non-AB piece in the same previous part (e.g. audio, graphics)
-			const previousNonAbPiece = createPieceInstance(sourceLayerId2, { start: 0, duration: 10000 })
-
-			const currentPiece = createPieceInstance(sourceLayerId, { start: 0 })
-
-			const now = 990000
-			const nowInPart = 2000
-			const currentPartStarted = now - nowInPart
-			const previousPartStarted = currentPartStarted - 5000
-			const keepaliveDuration = 1020
-
-			const previousPartInfo = createPartInstanceInfo(
-				previousPartStarted,
-				nowInPart + 5000,
-				createPartInstance(),
-				[previousAbPiece, previousNonAbPiece]
-			)
-
-			// Current part has a stinger inTransition with previousPartKeepaliveDuration
-			const currentPartInfo = createPartInstanceInfo(
-				currentPartStarted,
-				nowInPart,
-				createPartInstance({
-					inTransition: {
-						blockTakeDuration: 0,
-						previousPartKeepaliveDuration: keepaliveDuration,
-						partContentDelayDuration: 0,
-					},
-				}),
-				[currentPiece]
-			)
-
-			const resolvedPieces = getResolvedPiecesForPartInstancesOnTimeline(
-				context,
-				{
-					current: currentPartInfo,
-					previous: previousPartInfo,
-				},
-				now
-			)
-
-			// Pieces WITH abSessions: resolvedDuration must be undefined so the AB resolver's
-			// assignPlayersForLookahead excludes this player from lastSessionPerSlot. This prevents
-			// a future lookahead from being placed on the previous player (e.g. player_a / input=6)
-			// before the stinger cut point, which would fire LIST_REMOVE_ALL causing a black frame.
-			// Pieces WITHOUT abSessions: natural duration is preserved (starts are still offset correctly).
-			expect(stripResult(resolvedPieces)).toEqual([
-				{
-					_id: previousAbPiece._id,
-					resolvedStart: previousPartStarted,
-					resolvedDuration: undefined, // cleared — AB resolver ignores this player for lookahead
-				},
-				{
-					_id: previousNonAbPiece._id,
-					resolvedStart: previousPartStarted,
-					resolvedDuration: 10000, // natural duration preserved, no artificial cap
-				},
-				{
-					_id: currentPiece._id,
-					resolvedStart: currentPartStarted,
 					resolvedDuration: undefined,
 				},
 			] satisfies StrippedResult)

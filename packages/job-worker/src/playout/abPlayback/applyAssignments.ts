@@ -42,29 +42,6 @@ export function applyAbPlayerObjectAssignments(
 		}
 		newAssignments[sessionId] = { sessionId, playerId, lookahead }
 	}
-	const disableUnassignedLookaheadObjects = (
-		sessionId: string,
-		reason: 'missing-player' | 'unexpected-session' | 'open-ended-active',
-		objs: OnGenerateTimelineObjExt[]
-	): void => {
-		const lookaheadsToDisable = objs.filter((obj) => !!obj.isLookahead && !obj.disabled)
-		if (!lookaheadsToDisable.length) return
-
-		for (const obj of lookaheadsToDisable) {
-			obj.disabled = true
-		}
-
-		logger.debug(
-			`[AB_LOOKAHEAD_GUARD] disabled=${
-				lookaheadsToDisable.length
-			} session="${poolName}"-"${sessionId}" reason=${reason} ids=${lookaheadsToDisable
-				.map((obj) => obj.id)
-				.join(',')}`
-		)
-	}
-	const hasOpenEndedActiveSession = resolvedAssignments.some(
-		(req) => req.lookaheadRank === undefined && req.end === undefined
-	)
 
 	// collect objects by their sessionId
 	const groupedObjectsMap = new Map<string, Array<OnGenerateTimelineObjExt>>()
@@ -88,12 +65,6 @@ export function applyAbPlayerObjectAssignments(
 	// Apply the known assignments
 	for (const [sessionId, objs] of groupedObjectsMap.entries()) {
 		if (sessionId === 'undefined') continue
-		if (hasOpenEndedActiveSession) {
-			// While any regular session in this pool is open-ended, keep all lookahead objects inert.
-			// This avoids lookahead list-sync operations reclaiming the outgoing player during stinger/keepalive.
-			disableUnassignedLookaheadObjects(sessionId, 'open-ended-active', objs)
-		}
-		const objsToAssign = objs.filter((obj) => !obj.isLookahead)
 
 		const matchingAssignment = resolvedAssignments.find((req) => req.id === sessionId)
 
@@ -105,14 +76,12 @@ export function applyAbPlayerObjectAssignments(
 						abConfiguration,
 						poolName,
 						matchingAssignment.playerId,
-						objsToAssign
+						objs
 					)
 				)
 				persistAssignment(sessionId, matchingAssignment.playerId, !!matchingAssignment.lookaheadRank)
 			} else {
-				// A warning will already have been raised about this having no player.
-				// Guard against unassigned lookaheads accidentally driving pending/default layers.
-				disableUnassignedLookaheadObjects(sessionId, 'missing-player', objs)
+				// A warning will already have been raised about this having no player
 			}
 		} else {
 			// This is a group that shouldn't exist, so are likely a bug. There isnt a lot we can do beyond warn about the issue
@@ -122,12 +91,9 @@ export function applyAbPlayerObjectAssignments(
 			const prev = previousAssignmentMap?.[sessionId]
 			if (prev) {
 				failedObjects.push(
-					...updateObjectsToAbPlayer(blueprintContext, abConfiguration, poolName, prev.playerId, objsToAssign)
+					...updateObjectsToAbPlayer(blueprintContext, abConfiguration, poolName, prev.playerId, objs)
 				)
 				persistAssignment(sessionId, prev.playerId, false)
-			} else {
-				// If we can't map this session at all, make sure any lookahead objects stay inert.
-				disableUnassignedLookaheadObjects(sessionId, 'unexpected-session', objs)
 			}
 		}
 	}
