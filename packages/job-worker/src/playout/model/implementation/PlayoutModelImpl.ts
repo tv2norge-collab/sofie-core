@@ -848,8 +848,8 @@ export class PlayoutModelImpl extends PlayoutModelReadonlyImpl implements Playou
 
 	setSegmentStartedPlayback(segmentPlayoutId: SegmentPlayoutId, timestamp: number): void {
 		const segmentPlayoutIdsToKeep: string[] = []
-		if (this.previousPartInstance) {
-			segmentPlayoutIdsToKeep.push(unprotectString(this.previousPartInstance.partInstance.segmentPlayoutId))
+		for (const prev of this.previousPartInstances) {
+			segmentPlayoutIdsToKeep.push(unprotectString(prev.partInstance.segmentPlayoutId))
 		}
 		if (this.currentPartInstance) {
 			segmentPlayoutIdsToKeep.push(unprotectString(this.currentPartInstance.partInstance.segmentPlayoutId))

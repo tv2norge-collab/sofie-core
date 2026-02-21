@@ -348,7 +348,7 @@ export async function getTimelineRundown(
 					context.getShowStyleBlueprintConfig(showStyle),
 					playoutModel.playlist,
 					activeRundown.rundown,
-					previousPartInstances[0]?.partInstance ?? undefined,
+					previousPartInstances.map((pi) => pi.partInstance),
 					currentPartInstance?.partInstance,
 					nextPartInstance?.partInstance,
 					resolvedPieces
