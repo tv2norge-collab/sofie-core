@@ -646,7 +646,7 @@ async function getSelectedPartInstances(
 ) {
 	const ids = _.compact([
 		playlist.currentPartInfo?.partInstanceId,
-		playlist.previousPartInfo?.partInstanceId,
+		playlist.previousPartsInfo?.[0]?.partInstanceId,
 		playlist.nextPartInfo?.partInstanceId,
 	])
 
@@ -661,7 +661,7 @@ async function getSelectedPartInstances(
 
 	const currentPartInstance = instances.find((inst) => inst._id === playlist.currentPartInfo?.partInstanceId)
 	const nextPartInstance = instances.find((inst) => inst._id === playlist.nextPartInfo?.partInstanceId)
-	const previousPartInstance = instances.find((inst) => inst._id === playlist.previousPartInfo?.partInstanceId)
+	const previousPartInstance = instances.find((inst) => inst._id === playlist.previousPartsInfo?.[0]?.partInstanceId)
 
 	if (playlist.currentPartInfo?.partInstanceId && !currentPartInstance)
 		logger.error(
@@ -671,9 +671,9 @@ async function getSelectedPartInstances(
 		logger.error(
 			`playlist.nextPartInfo is set, but PartInstance "${playlist.nextPartInfo?.partInstanceId}" was not found!`
 		)
-	if (playlist.previousPartInfo?.partInstanceId && !previousPartInstance)
+	if (playlist.previousPartsInfo?.[0]?.partInstanceId && !previousPartInstance)
 		logger.error(
-			`playlist.previousPartInfo is set, but PartInstance "${playlist.previousPartInfo?.partInstanceId}" was not found!`
+			`playlist.previousPartsInfo[0] is set, but PartInstance "${playlist.previousPartsInfo?.[0]?.partInstanceId}" was not found!`
 		)
 
 	return {
@@ -845,7 +845,7 @@ async function removeSegments(
 	for (const segmentId of purgeSegmentIds) {
 		logger.debug(
 			`IngestModel: Removing segment "${segmentId}" (` +
-				`previousPartInfo?.partInstanceId: ${newPlaylist.previousPartInfo?.partInstanceId},` +
+				`previousPartsInfo[0]?.partInstanceId: ${newPlaylist.previousPartsInfo?.[0]?.partInstanceId},` +
 				`currentPartInfo?.partInstanceId: ${newPlaylist.currentPartInfo?.partInstanceId},` +
 				`nextPartInfo?.partInstanceId: ${newPlaylist.nextPartInfo?.partInstanceId},` +
 				`previousPartInstance.segmentId: ${!previousPartInstance ? 'N/A' : previousPartInstance.segmentId},` +

@@ -111,15 +111,17 @@ export async function getLookeaheadObjects(
 			: undefined,
 	])
 
-	// Track the previous info for checking how the timeline will be built
+	// Track the previous info for checking how the timeline will be built.
+	// Lookahead only needs the most-recent previous part (index 0) for piece-continuation checks.
 	let previousPartInfo: PartInstanceAndPieceInstances | undefined
-	if (partInstancesInfo0.previous) {
+	const previousInfoEntry = partInstancesInfo0.previous?.[0]
+	if (previousInfoEntry) {
 		previousPartInfo = removeInfiniteContinuations({
-			part: partInstancesInfo0.previous.partInstance,
+			part: previousInfoEntry.partInstance,
 			onTimeline: true,
-			nowInPart: partInstancesInfo0.previous.nowInPart,
-			allPieces: getPrunedEndedPieceInstances(partInstancesInfo0.previous),
-			calculatedTimings: partInstancesInfo0.previous.calculatedTimings,
+			nowInPart: previousInfoEntry.nowInPart,
+			allPieces: getPrunedEndedPieceInstances(previousInfoEntry),
+			calculatedTimings: previousInfoEntry.calculatedTimings,
 		})
 	}
 

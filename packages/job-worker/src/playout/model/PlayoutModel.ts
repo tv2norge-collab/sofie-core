@@ -102,9 +102,15 @@ export interface PlayoutModelReadonly extends StudioPlayoutModelBaseReadonly {
 	 */
 	get olderPartInstances(): PlayoutPartInstanceModel[]
 	/**
-	 * The PartInstance previously played, if any
+	 * The most recently played PartInstance (index 0 of previousPartsInfo), if any.
+	 * Convenience accessor; use `previousPartInstances` when you need the full chain.
 	 */
 	get previousPartInstance(): PlayoutPartInstanceModel | null
+	/**
+	 * All previously-played PartInstances that are still contributing to the timeline due to
+	 * keepalive / postroll / preroll overlap, ordered most-recent-first.
+	 */
+	get previousPartInstances(): PlayoutPartInstanceModel[]
 	/**
 	 * The PartInstance currently being played, if any
 	 */
@@ -114,11 +120,11 @@ export interface PlayoutModelReadonly extends StudioPlayoutModelBaseReadonly {
 	 */
 	get nextPartInstance(): PlayoutPartInstanceModel | null
 	/**
-	 * Ids of the previous, current and next PartInstances
+	 * Ids of all previous, current and next PartInstances (includes all entries of previousPartsInfo)
 	 */
 	get selectedPartInstanceIds(): PartInstanceId[]
 	/**
-	 * The previous, current and next PartInstances
+	 * All previous, current and next PartInstances
 	 */
 	get selectedPartInstances(): PlayoutPartInstanceModel[]
 	/**
@@ -293,6 +299,13 @@ export interface PlayoutModel extends PlayoutModelReadonly, StudioPlayoutModelBa
 	 * @param partInstance The PartInstance the event is in relation to
 	 */
 	queueNotifyCurrentlyPlayingPartEvent(rundownId: RundownId, partInstance: PlayoutPartInstanceModel | null): void
+
+	/**
+	 * Drop any entries from `previousPartsInfo` whose PartInstance has a confirmed `reportedStoppedPlayback`.
+	 * Call this after `reportedStoppedPlayback` is set on a PartInstance so the playlist document
+	 * stops carrying stale previous-part references once they are physically done.
+	 */
+	prunePreviousPartInstances(): void
 
 	/**
 	 * Remove all loaded PartInstances marked as `rehearsal` from this RundownPlaylist

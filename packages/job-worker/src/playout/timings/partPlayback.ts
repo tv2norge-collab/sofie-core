@@ -228,5 +228,8 @@ export function reportPartInstanceHasStopped(
 
 	if (timestampUpdated) {
 		playoutModel.queuePartInstanceTimingEvent(partInstance.partInstance._id)
+		// Now that reportedStoppedPlayback is confirmed, drop this entry from previousPartsInfo
+		// if it was still tracked there. This is the earliest safe moment to prune it.
+		playoutModel.prunePreviousPartInstances()
 	}
 }

@@ -426,7 +426,7 @@ describe('Resolved Pieces', () => {
 
 			const resolvedPieces = getResolvedPiecesForPartInstancesOnTimeline(
 				context,
-				{ current: currentPartInfo },
+				{ previous: [], current: currentPartInfo },
 				now
 			)
 
@@ -466,7 +466,7 @@ describe('Resolved Pieces', () => {
 			// Check the result
 			const simpleResolvedPieces = getResolvedPiecesForPartInstancesOnTimeline(
 				context,
-				{ current: currentPartInfo },
+				{ previous: [], current: currentPartInfo },
 				now
 			)
 			expect(stripResult(simpleResolvedPieces)).toEqual([
@@ -510,7 +510,7 @@ describe('Resolved Pieces', () => {
 
 			const simpleResolvedPieces = getResolvedPiecesForPartInstancesOnTimeline(
 				context,
-				{ current: currentPartInfo },
+				{ previous: [], current: currentPartInfo },
 				now
 			)
 			expect(stripResult(simpleResolvedPieces)).toEqual([
@@ -542,7 +542,7 @@ describe('Resolved Pieces', () => {
 
 			const simpleResolvedPieces = getResolvedPiecesForPartInstancesOnTimeline(
 				context,
-				{ current: currentPartInfo },
+				{ previous: [], current: currentPartInfo },
 				now
 			)
 			expect(stripResult(simpleResolvedPieces)).toEqual([
@@ -587,7 +587,7 @@ describe('Resolved Pieces', () => {
 
 			const simpleResolvedPieces = getResolvedPiecesForPartInstancesOnTimeline(
 				context,
-				{ current: currentPartInfo },
+				{ previous: [], current: currentPartInfo },
 				now
 			)
 			expect(stripResult(simpleResolvedPieces)).toEqual([
@@ -632,7 +632,7 @@ describe('Resolved Pieces', () => {
 
 			const simpleResolvedPieces = getResolvedPiecesForPartInstancesOnTimeline(
 				context,
-				{ current: currentPartInfo },
+				{ previous: [], current: currentPartInfo },
 				now
 			)
 			expect(stripResult(simpleResolvedPieces)).toEqual([
@@ -667,7 +667,7 @@ describe('Resolved Pieces', () => {
 
 			const simpleResolvedPieces = getResolvedPiecesForPartInstancesOnTimeline(
 				context,
-				{ current: currentPartInfo },
+				{ previous: [], current: currentPartInfo },
 				now
 			)
 			expect(stripResult(simpleResolvedPieces)).toEqual([
@@ -707,7 +707,7 @@ describe('Resolved Pieces', () => {
 				context,
 				{
 					current: currentPartInfo,
-					previous: previousPartInfo,
+					previous: [previousPartInfo],
 				},
 				now
 			)
@@ -761,7 +761,7 @@ describe('Resolved Pieces', () => {
 				context,
 				{
 					current: currentPartInfo,
-					previous: previousPartInfo,
+					previous: [previousPartInfo],
 				},
 				now
 			)
@@ -839,7 +839,7 @@ describe('Resolved Pieces', () => {
 				context,
 				{
 					current: currentPartInfo,
-					previous: previousPartInfo,
+					previous: [previousPartInfo],
 				},
 				now
 			)
@@ -891,6 +891,7 @@ describe('Resolved Pieces', () => {
 			const simpleResolvedPieces = getResolvedPiecesForPartInstancesOnTimeline(
 				context,
 				{
+					previous: [],
 					current: currentPartInfo,
 					next: nextPartInfo,
 				},
@@ -947,6 +948,7 @@ describe('Resolved Pieces', () => {
 			const simpleResolvedPieces = getResolvedPiecesForPartInstancesOnTimeline(
 				context,
 				{
+					previous: [],
 					current: currentPartInfo,
 					next: nextPartInfo,
 				},
@@ -1030,6 +1032,7 @@ describe('Resolved Pieces', () => {
 			const simpleResolvedPieces = getResolvedPiecesForPartInstancesOnTimeline(
 				context,
 				{
+					previous: [],
 					current: currentPartInfo,
 					next: nextPartInfo,
 				},
@@ -1050,6 +1053,110 @@ describe('Resolved Pieces', () => {
 				{
 					_id: piece010._id,
 					resolvedStart: nextPartStart,
+					resolvedDuration: undefined,
+				},
+			] satisfies StrippedResult)
+		})
+
+		test('two previous parts: each is capped at the start of the part that followed it', async () => {
+			const sourceLayerId = Object.keys(sourceLayers)[0]
+			expect(sourceLayerId).toBeTruthy()
+
+			// Timeline:   prev1 starts  |  prev0 starts  |  current starts  |  now
+			//             t=1000         t=5000           t=8000             t=10000
+			const now = 10000
+			const currentStarted = 8000
+			const prev0Started = 5000
+			const prev1Started = 1000
+
+			const piecePrev1 = createPieceInstance(sourceLayerId, { start: 0 })
+			const piecePrev0 = createPieceInstance(sourceLayerId, { start: 0 })
+			const pieceCurrent = createPieceInstance(sourceLayerId, { start: 0 })
+
+			const prev1Info = createPartInstanceInfo(prev1Started, now - prev1Started, createPartInstance(), [
+				piecePrev1,
+			])
+			const prev0Info = createPartInstanceInfo(prev0Started, now - prev0Started, createPartInstance(), [
+				piecePrev0,
+			])
+			const currentInfo = createPartInstanceInfo(currentStarted, now - currentStarted, createPartInstance(), [
+				pieceCurrent,
+			])
+
+			const resolvedPieces = getResolvedPiecesForPartInstancesOnTimeline(
+				context,
+				// most-recent previous first
+				{ previous: [prev0Info, prev1Info], current: currentInfo },
+				now
+			)
+
+			expect(stripResult(resolvedPieces)).toEqual([
+				{
+					_id: piecePrev1._id,
+					// prev1 is capped at prev0.partStarted
+					resolvedStart: prev1Started,
+					resolvedDuration: prev0Started - prev1Started, // 4000
+				},
+				{
+					_id: piecePrev0._id,
+					// prev0 is capped at currentStarted
+					resolvedStart: prev0Started,
+					resolvedDuration: currentStarted - prev0Started, // 3000
+				},
+				{
+					_id: pieceCurrent._id,
+					resolvedStart: currentStarted,
+					resolvedDuration: undefined,
+				},
+			] satisfies StrippedResult)
+		})
+
+		test('two previous parts: piece in older previous ending before cap is not extended', async () => {
+			const sourceLayerId = Object.keys(sourceLayers)[0]
+			expect(sourceLayerId).toBeTruthy()
+
+			// Timeline:   prev1 starts  |  prev0 starts  |  current starts  |  now
+			//             t=1000         t=5000           t=8000             t=10000
+			const now = 10000
+			const currentStarted = 8000
+			const prev0Started = 5000
+			const prev1Started = 1000
+
+			// Short piece: ends at t=2000, well before prev0 starts at t=5000
+			const shortPiece = createPieceInstance(sourceLayerId, { start: 0, duration: 2000 })
+			const piecePrev0 = createPieceInstance(sourceLayerId, { start: 0 })
+			const pieceCurrent = createPieceInstance(sourceLayerId, { start: 0 })
+
+			const prev1Info = createPartInstanceInfo(prev1Started, now - prev1Started, createPartInstance(), [
+				shortPiece,
+			])
+			const prev0Info = createPartInstanceInfo(prev0Started, now - prev0Started, createPartInstance(), [
+				piecePrev0,
+			])
+			const currentInfo = createPartInstanceInfo(currentStarted, now - currentStarted, createPartInstance(), [
+				pieceCurrent,
+			])
+
+			const resolvedPieces = getResolvedPiecesForPartInstancesOnTimeline(
+				context,
+				{ previous: [prev0Info, prev1Info], current: currentInfo },
+				now
+			)
+
+			expect(stripResult(resolvedPieces)).toEqual([
+				{
+					_id: shortPiece._id,
+					resolvedStart: prev1Started,
+					resolvedDuration: 2000, // not extended to cap (cap=4000) — piece ends naturally before cap
+				},
+				{
+					_id: piecePrev0._id,
+					resolvedStart: prev0Started,
+					resolvedDuration: currentStarted - prev0Started, // 3000
+				},
+				{
+					_id: pieceCurrent._id,
+					resolvedStart: currentStarted,
 					resolvedDuration: undefined,
 				},
 			] satisfies StrippedResult)

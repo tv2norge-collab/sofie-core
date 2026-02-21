@@ -27,7 +27,7 @@ const PLAYLIST_KEYS = [
 	'activationId',
 	'currentPartInfo',
 	'nextPartInfo',
-	'previousPartInfo',
+	'previousPartsInfo',
 	'rundownIdsInOrder',
 ] as const
 type Playlist = PickKeys<DBRundownPlaylist, typeof PLAYLIST_KEYS>
@@ -117,10 +117,11 @@ export class PieceInstancesHandler extends PublicationCollection<
 		if (!this._collectionData) return false
 		const collection = this.getCollectionOrFail()
 
-		const inPreviousPartInstance = this._currentPlaylist?.previousPartInfo?.partInstanceId
+		// For piece-instances purposes we only need the most-recent previous instance
+		const inPreviousPartInstance = this._currentPlaylist?.previousPartsInfo?.[0]?.partInstanceId
 			? this.processAndPrunePieceInstanceTimings(
 					this._partInstances?.previous,
-					collection.find({ partInstanceId: this._currentPlaylist.previousPartInfo.partInstanceId }),
+					collection.find({ partInstanceId: this._currentPlaylist.previousPartsInfo[0].partInstanceId }),
 					true
 			  )
 			: []
@@ -219,7 +220,7 @@ export class PieceInstancesHandler extends PublicationCollection<
 		this._partInstanceIds = this._currentPlaylist
 			? _.compact(
 					[
-						this._currentPlaylist.previousPartInfo?.partInstanceId,
+						...(this._currentPlaylist.previousPartsInfo ?? []).map((info) => info.partInstanceId),
 						this._currentPlaylist.nextPartInfo?.partInstanceId,
 						this._currentPlaylist.currentPartInfo?.partInstanceId,
 					].sort()

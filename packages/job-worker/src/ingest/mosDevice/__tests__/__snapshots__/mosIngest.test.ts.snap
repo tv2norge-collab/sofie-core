@@ -11,7 +11,7 @@ exports[`Test recieved mos ingest payloads mosRoCreate 1`] = `
   "nextPartInfo": null,
   "notes": [],
   "organizationId": null,
-  "previousPartInfo": null,
+  "previousPartsInfo": [],
   "rundownIdsInOrder": [
     "5meLdE_m5k28xXw1vtX2JX8mSYQ_",
   ],
@@ -305,7 +305,7 @@ exports[`Test recieved mos ingest payloads mosRoCreate: replace existing 1`] = `
   "nextPartInfo": null,
   "notes": [],
   "organizationId": null,
-  "previousPartInfo": null,
+  "previousPartsInfo": [],
   "rundownIdsInOrder": [
     "5meLdE_m5k28xXw1vtX2JX8mSYQ_",
   ],
@@ -591,7 +591,7 @@ exports[`Test recieved mos ingest payloads mosRoFullStory: Valid data 1`] = `
   "nextPartInfo": null,
   "notes": [],
   "organizationId": null,
-  "previousPartInfo": null,
+  "previousPartsInfo": [],
   "rundownIdsInOrder": [
     "5meLdE_m5k28xXw1vtX2JX8mSYQ_",
   ],
@@ -898,7 +898,7 @@ exports[`Test recieved mos ingest payloads mosRoReadyToAir: Update ro 1`] = `
   "nextPartInfo": null,
   "notes": [],
   "organizationId": null,
-  "previousPartInfo": null,
+  "previousPartsInfo": [],
   "rundownIdsInOrder": [
     "5meLdE_m5k28xXw1vtX2JX8mSYQ_",
   ],
@@ -1195,7 +1195,7 @@ exports[`Test recieved mos ingest payloads mosRoStatus: Update ro 1`] = `
   "nextPartInfo": null,
   "notes": [],
   "organizationId": null,
-  "previousPartInfo": null,
+  "previousPartsInfo": [],
   "rundownIdsInOrder": [
     "5meLdE_m5k28xXw1vtX2JX8mSYQ_",
   ],
@@ -1490,7 +1490,7 @@ exports[`Test recieved mos ingest payloads mosRoStoryDelete: Remove segment 1`] 
   "nextPartInfo": null,
   "notes": [],
   "organizationId": null,
-  "previousPartInfo": null,
+  "previousPartsInfo": [],
   "rundownIdsInOrder": [
     "5meLdE_m5k28xXw1vtX2JX8mSYQ_",
   ],
@@ -1753,7 +1753,7 @@ exports[`Test recieved mos ingest payloads mosRoStoryInsert: Into segment 1`] = 
   "nextPartInfo": null,
   "notes": [],
   "organizationId": null,
-  "previousPartInfo": null,
+  "previousPartsInfo": [],
   "rundownIdsInOrder": [
     "5meLdE_m5k28xXw1vtX2JX8mSYQ_",
   ],
@@ -2061,7 +2061,7 @@ exports[`Test recieved mos ingest payloads mosRoStoryInsert: New segment 1`] = `
   "nextPartInfo": null,
   "notes": [],
   "organizationId": null,
-  "previousPartInfo": null,
+  "previousPartsInfo": [],
   "rundownIdsInOrder": [
     "5meLdE_m5k28xXw1vtX2JX8mSYQ_",
   ],
@@ -2377,7 +2377,7 @@ exports[`Test recieved mos ingest payloads mosRoStoryMove: Move whole segment to
   "nextPartInfo": null,
   "notes": [],
   "organizationId": null,
-  "previousPartInfo": null,
+  "previousPartsInfo": [],
   "rundownIdsInOrder": [
     "5meLdE_m5k28xXw1vtX2JX8mSYQ_",
   ],
@@ -2676,7 +2676,7 @@ exports[`Test recieved mos ingest payloads mosRoStoryMove: Within segment 1`] = 
   "nextPartInfo": null,
   "notes": [],
   "organizationId": null,
-  "previousPartInfo": null,
+  "previousPartsInfo": [],
   "rundownIdsInOrder": [
     "5meLdE_m5k28xXw1vtX2JX8mSYQ_",
   ],
@@ -2975,7 +2975,7 @@ exports[`Test recieved mos ingest payloads mosRoStoryReplace: Same segment 1`] =
   "nextPartInfo": null,
   "notes": [],
   "organizationId": null,
-  "previousPartInfo": null,
+  "previousPartsInfo": [],
   "rundownIdsInOrder": [
     "5meLdE_m5k28xXw1vtX2JX8mSYQ_",
   ],
@@ -3273,7 +3273,7 @@ exports[`Test recieved mos ingest payloads mosRoStorySwap: Swap across segments 
   "nextPartInfo": null,
   "notes": [],
   "organizationId": null,
-  "previousPartInfo": null,
+  "previousPartsInfo": [],
   "rundownIdsInOrder": [
     "5meLdE_m5k28xXw1vtX2JX8mSYQ_",
   ],
@@ -3564,7 +3564,7 @@ exports[`Test recieved mos ingest payloads mosRoStorySwap: Swap across segments2
   "nextPartInfo": null,
   "notes": [],
   "organizationId": null,
-  "previousPartInfo": null,
+  "previousPartsInfo": [],
   "rundownIdsInOrder": [
     "5meLdE_m5k28xXw1vtX2JX8mSYQ_",
   ],
@@ -3887,7 +3887,7 @@ exports[`Test recieved mos ingest payloads mosRoStorySwap: With first in same se
   "nextPartInfo": null,
   "notes": [],
   "organizationId": null,
-  "previousPartInfo": null,
+  "previousPartsInfo": [],
   "rundownIdsInOrder": [
     "5meLdE_m5k28xXw1vtX2JX8mSYQ_",
   ],
@@ -4186,7 +4186,7 @@ exports[`Test recieved mos ingest payloads mosRoStorySwap: Within same segment 1
   "nextPartInfo": null,
   "notes": [],
   "organizationId": null,
-  "previousPartInfo": null,
+  "previousPartsInfo": [],
   "rundownIdsInOrder": [
     "5meLdE_m5k28xXw1vtX2JX8mSYQ_",
   ],

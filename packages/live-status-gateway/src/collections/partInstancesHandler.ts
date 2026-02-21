@@ -23,7 +23,7 @@ export interface SelectedPartInstances {
 const PLAYLIST_KEYS = [
 	'_id',
 	'activationId',
-	'previousPartInfo',
+	'previousPartsInfo',
 	'currentPartInfo',
 	'nextPartInfo',
 	'rundownIdsInOrder',
@@ -68,8 +68,8 @@ export class PartInstancesHandler extends PublicationCollection<
 	private updateCollectionData(): boolean {
 		if (!this._collectionData) return false
 		const collection = this.getCollectionOrFail()
-		const previousPartInstance = this._currentPlaylist?.previousPartInfo?.partInstanceId
-			? collection.findOne(this._currentPlaylist.previousPartInfo.partInstanceId)
+		const previousPartInstance = this._currentPlaylist?.previousPartsInfo?.[0]?.partInstanceId
+			? collection.findOne(this._currentPlaylist.previousPartsInfo[0].partInstanceId)
 			: undefined
 		const currentPartInstance = this._currentPlaylist?.currentPartInfo?.partInstanceId
 			? collection.findOne(this._currentPlaylist.currentPartInfo.partInstanceId)

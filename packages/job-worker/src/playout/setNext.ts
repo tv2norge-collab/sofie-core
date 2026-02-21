@@ -164,7 +164,7 @@ async function setNextPartAndCheckForPendingMoveNextPart(
 		const selectedPartInstanceIds = _.compact([
 			newPartInstance.partInstance._id,
 			playoutModel.playlist.currentPartInfo?.partInstanceId,
-			playoutModel.playlist.previousPartInfo?.partInstanceId,
+			playoutModel.playlist.previousPartsInfo?.[0]?.partInstanceId,
 		])
 
 		// reset any previous instances of this part

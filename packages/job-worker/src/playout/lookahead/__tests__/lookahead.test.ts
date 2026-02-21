@@ -159,7 +159,7 @@ describe('Lookahead', () => {
 	}
 
 	test('No pieces', async () => {
-		const partInstancesInfo: SelectedPartInstancesTimelineInfo = {}
+		const partInstancesInfo: SelectedPartInstancesTimelineInfo = { previous: [] }
 
 		const fakeParts = partIds.map((p) => ({ part: { _id: p } as any, usesInTransition: true, pieces: [] }))
 		getOrderedPartsAfterPlayheadMock.mockReturnValueOnce(fakeParts.map((p) => p.part))
@@ -184,7 +184,7 @@ describe('Lookahead', () => {
 	}
 
 	test('got some objects', async () => {
-		const partInstancesInfo: SelectedPartInstancesTimelineInfo = {}
+		const partInstancesInfo: SelectedPartInstancesTimelineInfo = { previous: [] }
 
 		const fakeParts = partIds.map((p) => ({ part: { _id: p } as any, usesInTransition: true, pieces: [] }))
 		getOrderedPartsAfterPlayheadMock.mockReturnValueOnce(fakeParts.map((p) => p.part))
@@ -218,7 +218,7 @@ describe('Lookahead', () => {
 	})
 
 	test('Different max distances', async () => {
-		const partInstancesInfo: SelectedPartInstancesTimelineInfo = {}
+		const partInstancesInfo: SelectedPartInstancesTimelineInfo = { previous: [] }
 
 		// Set really low
 		{
@@ -269,21 +269,22 @@ describe('Lookahead', () => {
 		// It does have assertions, but hidden inside helper methods
 		expect(true).toBeTruthy()
 
-		const partInstancesInfo: SelectedPartInstancesTimelineInfo = {}
-		partInstancesInfo.previous = {
+		const partInstancesInfo: SelectedPartInstancesTimelineInfo = { previous: [] }
+		const previousEntry = {
 			partInstance: { _id: 'abc2', part: { _id: 'abc' } } as any,
 			nowInPart: 987,
 			partStarted: getCurrentTime() + 546,
 			pieceInstances: ['1', '2'] as any,
 			calculatedTimings: { inTransitionStart: null } as any,
 		}
+		partInstancesInfo.previous = [previousEntry]
 
 		const expectedPrevious = {
-			part: partInstancesInfo.previous.partInstance,
+			part: previousEntry.partInstance,
 			onTimeline: true,
-			nowInPart: partInstancesInfo.previous.nowInPart,
-			allPieces: partInstancesInfo.previous.pieceInstances,
-			calculatedTimings: partInstancesInfo.previous.calculatedTimings,
+			nowInPart: previousEntry.nowInPart,
+			allPieces: previousEntry.pieceInstances,
+			calculatedTimings: previousEntry.calculatedTimings,
 		}
 
 		// With a previous

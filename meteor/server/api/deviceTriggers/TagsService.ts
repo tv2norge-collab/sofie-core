@@ -54,7 +54,7 @@ export class TagsService {
 			return false
 		}
 
-		const previousPartInstanceId = rundownPlaylist?.previousPartInfo?.partInstanceId
+		const previousPartInstanceId = rundownPlaylist?.previousPartsInfo?.[0]?.partInstanceId
 		const currentPartInstanceId = rundownPlaylist?.currentPartInfo?.partInstanceId
 		const nextPartInstanceId = rundownPlaylist?.nextPartInfo?.partInstanceId
 
