@@ -12,28 +12,6 @@ describe('PlayoutModelImpl', () => {
 	const playlistId = protectString<RundownPlaylistId>('playlist0')
 	const studioId = protectString('studio0')
 
-	function makePartInstance(id: string, reportedStoppedPlayback?: number): DBPartInstance {
-		return {
-			_id: protectString<PartInstanceId>(id),
-			rundownId: protectString('rd0'),
-			segmentId: protectString('seg0'),
-			playlistActivationId: protectString('act0'),
-			segmentPlayoutId: protectString('segpayout0'),
-			rehearsal: false,
-			takeCount: 0,
-			part: {
-				_id: protectString(id + '_part'),
-				_rank: 0,
-				rundownId: protectString('rd0'),
-				segmentId: protectString('seg0'),
-				externalId: id,
-				title: id,
-				expectedDurationWithTransition: undefined,
-			},
-			...(reportedStoppedPlayback !== undefined ? { timings: { setAsNext: 0, reportedStoppedPlayback } } : {}),
-		}
-	}
-
 	function makeSelectedPartInfo(partInstanceId: string): SelectedPartInstance {
 		return {
 			partInstanceId: protectString<PartInstanceId>(partInstanceId),
@@ -120,9 +98,9 @@ describe('PlayoutModelImpl', () => {
 			expect(model.playlist.previousPartsInfo).toEqual([])
 		})
 
-		it('caps previousPartsInfo at 10 entries', () => {
-			// Seed with 9 existing previous entries; cycle in a 10th via current
-			const existing = Array.from({ length: 9 }, (_, i) => makeSelectedPartInfo(`pi_old_${i}`))
+		it('caps previousPartsInfo at 3 entries', () => {
+			// Seed with 2 existing previous entries; cycle in a 3rd via current
+			const existing = Array.from({ length: 2 }, (_, i) => makeSelectedPartInfo(`pi_old_${i}`))
 			const current = makeSelectedPartInfo('pi_current')
 			const next = makeSelectedPartInfo('pi_next')
 
@@ -134,98 +112,57 @@ describe('PlayoutModelImpl', () => {
 
 			model.cycleSelectedPartInstances()
 
-			expect(model.playlist.previousPartsInfo).toHaveLength(10)
+			expect(model.playlist.previousPartsInfo).toHaveLength(3)
 			// Most recent is first
 			expect(model.playlist.previousPartsInfo[0]).toEqual(current)
 
-			// Now cycle one more in — should still be capped at 10, oldest dropped
+			// Now cycle one more in — should still be capped at 3, oldest dropped
 			;(model as any).playlistImpl.currentPartInfo = next
 			;(model as any).playlistImpl.nextPartInfo = makeSelectedPartInfo('pi_newer')
 			model.cycleSelectedPartInstances()
 
-			expect(model.playlist.previousPartsInfo).toHaveLength(10)
+			expect(model.playlist.previousPartsInfo).toHaveLength(3)
 			expect(model.playlist.previousPartsInfo[0]).toEqual(next)
 		})
 	})
 
-	describe('prunePreviousPartInstances', () => {
-		it('keeps all entries when none have reported stopped playback', () => {
-			const pi0 = makePartInstance('pi0') // no reportedStoppedPlayback
-			const pi1 = makePartInstance('pi1') // no reportedStoppedPlayback
-			const model = createModel([pi0, pi1], {
-				previousPartsInfo: [makeSelectedPartInfo('pi0'), makeSelectedPartInfo('pi1')],
-			})
+	describe('cycleSelectedPartInstances pruning of stopped entries', () => {
+		it('caps previousPartsInfo at 3 entries', () => {
+			const existing = Array.from({ length: 3 }, (_, i) => makeSelectedPartInfo(`pi_old_${i}`))
+			const current = makeSelectedPartInfo('pi_current')
+			const next = makeSelectedPartInfo('pi_next')
 
-			model.prunePreviousPartInstances()
-
-			expect(model.playlist.previousPartsInfo).toHaveLength(2)
-			expect(model.playlist.previousPartsInfo.map((p) => p.partInstanceId)).toEqual([
-				protectString('pi0'),
-				protectString('pi1'),
-			])
-		})
-
-		it('removes older entries that have reported stopped, keeps active newer ones', () => {
-			const pi0 = makePartInstance('pi0') // still running — most-recent
-			const pi1 = makePartInstance('pi1', 1000) // stopped — older
-			const model = createModel([pi0, pi1], {
-				// Most-recent first
-				previousPartsInfo: [makeSelectedPartInfo('pi0'), makeSelectedPartInfo('pi1')],
-			})
-
-			model.prunePreviousPartInstances()
-
-			expect(model.playlist.previousPartsInfo).toHaveLength(1)
-			expect(model.playlist.previousPartsInfo[0].partInstanceId).toEqual(protectString('pi0'))
-		})
-
-		it('always keeps at least one entry even if all have reported stopped', () => {
-			const pi0 = makePartInstance('pi0', 2000) // stopped — most-recent
-			const pi1 = makePartInstance('pi1', 1000) // stopped — older
-			const model = createModel([pi0, pi1], {
-				previousPartsInfo: [makeSelectedPartInfo('pi0'), makeSelectedPartInfo('pi1')],
-			})
-
-			model.prunePreviousPartInstances()
-
-			// Must not drop to zero — keep index 0 (the most-recent)
-			expect(model.playlist.previousPartsInfo).toHaveLength(1)
-			expect(model.playlist.previousPartsInfo[0].partInstanceId).toEqual(protectString('pi0'))
-		})
-
-		it('keeps entries whose PartInstance is not loaded (unknown state — safe default)', () => {
-			// pi0 is NOT passed as a loaded part instance, so it is unknown
 			const model = createModel([], {
-				previousPartsInfo: [makeSelectedPartInfo('pi0')],
+				currentPartInfo: current,
+				nextPartInfo: next,
+				previousPartsInfo: existing,
 			})
 
-			model.prunePreviousPartInstances()
+			model.cycleSelectedPartInstances()
 
-			// Unknown — should be retained, not dropped
-			expect(model.playlist.previousPartsInfo).toHaveLength(1)
+			expect(model.playlist.previousPartsInfo).toHaveLength(3)
+			expect(model.playlist.previousPartsInfo[0]).toEqual(current)
+			// oldest entry dropped
+			expect(model.playlist.previousPartsInfo.map((p) => p.partInstanceId)).not.toContain(
+				protectString('pi_old_2')
+			)
 		})
 
-		it('does not change previousPartsInfo when nothing needs pruning', () => {
-			const pi0 = makePartInstance('pi0')
-			const pi1 = makePartInstance('pi1')
-			const model = createModel([pi0, pi1], {
-				previousPartsInfo: [makeSelectedPartInfo('pi0'), makeSelectedPartInfo('pi1')],
+		it('does not exceed 3 entries across multiple cycles', () => {
+			const model = createModel([], {
+				currentPartInfo: makeSelectedPartInfo('pi0'),
+				nextPartInfo: makeSelectedPartInfo('pi1'),
+				previousPartsInfo: [],
 			})
 
-			const before = model.playlist.previousPartsInfo
+			for (let i = 1; i <= 5; i++) {
+				model.cycleSelectedPartInstances()
+				;(model as any).playlistImpl.currentPartInfo = makeSelectedPartInfo(`pi${i}`)
+				;(model as any).playlistImpl.nextPartInfo = makeSelectedPartInfo(`pi${i + 1}`)
+			}
+			model.cycleSelectedPartInstances()
 
-			model.prunePreviousPartInstances()
-
-			// Same content
-			expect(model.playlist.previousPartsInfo).toEqual(before)
-			expect(model.playlist.previousPartsInfo).toHaveLength(2)
-		})
-
-		it('handles an empty previousPartsInfo without crashing', () => {
-			const model = createModel([], { previousPartsInfo: [] })
-
-			expect(() => model.prunePreviousPartInstances()).not.toThrow()
-			expect(model.playlist.previousPartsInfo).toHaveLength(0)
+			expect(model.playlist.previousPartsInfo.length).toBeLessThanOrEqual(3)
 		})
 	})
 })

@@ -301,13 +301,6 @@ export interface PlayoutModel extends PlayoutModelReadonly, StudioPlayoutModelBa
 	queueNotifyCurrentlyPlayingPartEvent(rundownId: RundownId, partInstance: PlayoutPartInstanceModel | null): void
 
 	/**
-	 * Drop any entries from `previousPartsInfo` whose PartInstance has a confirmed `reportedStoppedPlayback`.
-	 * Call this after `reportedStoppedPlayback` is set on a PartInstance so the playlist document
-	 * stops carrying stale previous-part references once they are physically done.
-	 */
-	prunePreviousPartInstances(): void
-
-	/**
 	 * Remove all loaded PartInstances marked as `rehearsal` from this RundownPlaylist
 	 */
 	removeAllRehearsalPartInstances(): void

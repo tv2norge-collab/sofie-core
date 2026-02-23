@@ -514,29 +514,10 @@ export class PlayoutModelImpl extends PlayoutModelReadonlyImpl implements Playou
 		return this.context.setRouteSetActive(routeSetId, isActive)
 	}
 
-	prunePreviousPartInstances(): void {
-		const current = this.playlistImpl.previousPartsInfo ?? []
-		const before = current.length
-		// Filter out entries that have confirmed stopped playback, but always keep at least
-		// the most-recent entry so consumers can still read previousPartInstance[0].
-		const filtered = current.filter((info) => {
-			const partInstance = this.allPartInstances.get(info.partInstanceId)
-			// Keep entries whose instance hasn't reported stopped yet (still active on the timeline),
-			// or whose instance isn't loaded (unknown state – keep to be safe).
-			return !partInstance?.partInstance.timings?.reportedStoppedPlayback
-		})
-		this.playlistImpl.previousPartsInfo = filtered.length > 0 ? filtered : current.slice(0, 1)
-		if (this.playlistImpl.previousPartsInfo.length !== before) {
-			this.#playlistHasChanged = true
-		}
-	}
-
 	cycleSelectedPartInstances(): void {
 		// Push the current part to the front of the previousPartsInfo chain.
-		// We keep a hard cap to prevent unbounded growth – entries are also pruned via
-		// prunePreviousPartInstances() when reportedStoppedPlayback fires, so this only
-		// needs to guard against blueprints doing something really bad with part/piece timings.
-		const MAX_PREVIOUS_PARTS = 10
+		// Keep the 3 most-recent previous parts; older entries are dropped.
+		const MAX_PREVIOUS_PARTS = 3
 		const currentInfo = this.playlistImpl.currentPartInfo
 		if (currentInfo) {
 			this.playlistImpl.previousPartsInfo = [currentInfo, ...(this.playlistImpl.previousPartsInfo ?? [])].slice(

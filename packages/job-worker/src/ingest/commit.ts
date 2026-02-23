@@ -469,13 +469,17 @@ async function updatePartInstancesBasicProperties(
 		)
 
 	// Figure out which of the PartInstances should be reset and which should be marked as orphaned: deleted
+	const protectedPartInstanceIds = new Set<PartInstanceId>(
+		_.compact([
+			playlist.currentPartInfo?.partInstanceId,
+			playlist.nextPartInfo?.partInstanceId,
+			...(playlist.previousPartsInfo ?? []).map((p) => p.partInstanceId),
+		])
+	)
 	const instancesToReset: PartInstanceId[] = []
 	const instancesToOrphan: PartInstanceId[] = []
 	for (const partInstance of partInstancesToOrphan) {
-		if (
-			playlist.currentPartInfo?.partInstanceId !== partInstance._id &&
-			playlist.nextPartInfo?.partInstanceId !== partInstance._id
-		) {
+		if (!protectedPartInstanceIds.has(partInstance._id)) {
 			instancesToReset.push(partInstance._id)
 		} else {
 			instancesToOrphan.push(partInstance._id)
