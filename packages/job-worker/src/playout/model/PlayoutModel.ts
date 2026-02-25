@@ -28,6 +28,7 @@ import { PlayoutPartInstanceModel } from './PlayoutPartInstanceModel'
 import { PeripheralDevice } from '@sofie-automation/corelib/dist/dataModel/PeripheralDevice'
 import { DBRundown } from '@sofie-automation/corelib/dist/dataModel/Rundown'
 import { PlayoutPieceInstanceModel } from './PlayoutPieceInstanceModel'
+import { Time } from '@sofie-automation/blueprints-integration'
 import { PieceInstanceWithTimings } from '@sofie-automation/corelib/dist/playout/processAndPrune'
 import { PartCalculatedTimings } from '@sofie-automation/corelib/dist/playout/timings'
 import type { INotificationsModel } from '../../notifications/NotificationsModel'
@@ -301,11 +302,15 @@ export interface PlayoutModel extends PlayoutModelReadonly, StudioPlayoutModelBa
 	queueNotifyCurrentlyPlayingPartEvent(rundownId: RundownId, partInstance: PlayoutPartInstanceModel | null): void
 
 	/**
-	 * Drop any entries from `previousPartsInfo` whose PartInstance has a confirmed `reportedStoppedPlayback`.
-	 * Call this after `reportedStoppedPlayback` is set on a PartInstance so the playlist document
-	 * stops carrying stale previous-part references once they are physically done.
+	 * Drop stale entries from `previousPartsInfo` that are no longer contributing to the timeline.
+	 * An entry is dropped when its timeline group end time — derived from the reference part's
+	 * `partPlayoutTimings.fromPartRemaining` and `plannedStartedPlayback` — is already before `now`.
+	 * If timing data is unavailable for a reference part, the entry is kept (safe default).
+	 * At least one entry is always retained so consumers can still read `previousPartInstance[0]`.
+	 * The list is also capped at a maximum length to prevent unbounded growth.
+	 * @param now The current wall-clock time; provided by the caller so this method remains pure.
 	 */
-	prunePreviousPartInstances(): void
+	prunePreviousPartInstances(now: Time): void
 
 	/**
 	 * Remove all loaded PartInstances marked as `rehearsal` from this RundownPlaylist

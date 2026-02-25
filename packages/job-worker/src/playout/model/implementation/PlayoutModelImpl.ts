@@ -514,39 +514,53 @@ export class PlayoutModelImpl extends PlayoutModelReadonlyImpl implements Playou
 		return this.context.setRouteSetActive(routeSetId, isActive)
 	}
 
-	prunePreviousPartInstances(): void {
+	prunePreviousPartInstances(now: number): void {
 		const current = this.playlistImpl.previousPartsInfo ?? []
 		const before = current.length
-		// Filter out entries that have confirmed stopped playback, but always keep at least
-		// the most-recent entry so consumers can still read previousPartInstance[0].
-		const filtered = current.filter((info) => {
-			const partInstance = this.allPartInstances.get(info.partInstanceId)
-			// Keep entries whose instance hasn't reported stopped yet (still active on the timeline),
-			// or whose instance isn't loaded (unknown state – keep to be safe).
-			return !partInstance?.partInstance.timings?.reportedStoppedPlayback
+
+		// Keep entries whose timeline group has not yet ended; drop the rest.
+		// If timing data is unavailable for the reference part the entry is kept (safe default).
+		//
+		// An entry is dropped when its timeline group is known to have already ended:
+		//   - previous[0]: reference is the current part instance
+		//   - previous[i>0]: reference is previous[i-1]
+		//
+		// Group end time = reference.timings.plannedStartedPlayback + reference.partPlayoutTimings.fromPartRemaining
+		const filtered = current.filter((_info, i) => {
+			const referencePI =
+				i === 0
+					? this.currentPartInstance?.partInstance
+					: this.allPartInstances.get(current[i - 1].partInstanceId)?.partInstance
+
+			const referenceStarted = referencePI?.timings?.plannedStartedPlayback
+			const referenceTimings = referencePI?.partPlayoutTimings
+			if (referenceStarted !== undefined && referenceTimings !== undefined) {
+				return now <= referenceStarted + referenceTimings.fromPartRemaining
+			}
+
+			return true
 		})
-		this.playlistImpl.previousPartsInfo = filtered.length > 0 ? filtered : current.slice(0, 1)
+		// Always keep at least one entry, and never more than the cap.
+		// We keep a hard cap to prevent unbounded growth if blueprints were doing something really bad with part/piece timings.
+		const MAX_PREVIOUS_PARTS = 10
+		const pruned = filtered.length > 0 ? filtered.slice(0, MAX_PREVIOUS_PARTS) : current.slice(0, 1)
+		this.playlistImpl.previousPartsInfo = pruned
 		if (this.playlistImpl.previousPartsInfo.length !== before) {
 			this.#playlistHasChanged = true
 		}
 	}
 
 	cycleSelectedPartInstances(): void {
-		// Push the current part to the front of the previousPartsInfo chain.
-		// We keep a hard cap to prevent unbounded growth – entries are also pruned via
-		// prunePreviousPartInstances() when reportedStoppedPlayback fires, so this only
-		// needs to guard against blueprints doing something really bad with part/piece timings.
-		const MAX_PREVIOUS_PARTS = 10
 		const currentInfo = this.playlistImpl.currentPartInfo
 		if (currentInfo) {
-			this.playlistImpl.previousPartsInfo = [currentInfo, ...(this.playlistImpl.previousPartsInfo ?? [])].slice(
-				0,
-				MAX_PREVIOUS_PARTS
-			)
+			this.playlistImpl.previousPartsInfo = [currentInfo, ...(this.playlistImpl.previousPartsInfo ?? [])]
 		}
 		this.playlistImpl.currentPartInfo = this.playlistImpl.nextPartInfo
 		this.playlistImpl.nextPartInfo = null
-		this.playlistImpl.lastTakeTime = getCurrentTime()
+		const now = getCurrentTime()
+		this.playlistImpl.lastTakeTime = now
+
+		this.prunePreviousPartInstances(now)
 
 		this.#playlistHasChanged = true
 	}

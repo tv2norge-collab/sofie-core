@@ -1,5 +1,5 @@
 import { mock } from 'jest-mock-extended'
-import { protectString } from '@sofie-automation/corelib/dist/protectedString'
+import { protectString, unprotectString } from '@sofie-automation/corelib/dist/protectedString'
 import { PartInstanceId, RundownPlaylistId } from '@sofie-automation/corelib/dist/dataModel/Ids'
 import { DBPartInstance } from '@sofie-automation/corelib/dist/dataModel/PartInstance'
 import { SelectedPartInstance } from '@sofie-automation/corelib/dist/dataModel/RundownPlaylist'
@@ -7,12 +7,29 @@ import { PlaylistLock } from '../../../../jobs/lock'
 import { PlayoutModelImpl } from '../PlayoutModelImpl'
 import { setupDefaultJobEnvironment } from '../../../../__mocks__/context'
 import { defaultRundownPlaylist } from '../../../../__mocks__/defaultCollectionObjects'
+import { PartCalculatedTimings } from '@sofie-automation/corelib/dist/playout/timings'
 
 describe('PlayoutModelImpl', () => {
 	const playlistId = protectString<RundownPlaylistId>('playlist0')
 	const studioId = protectString('studio0')
 
-	function makePartInstance(id: string, reportedStoppedPlayback?: number): DBPartInstance {
+	const DEFAULT_PART_TIMINGS: PartCalculatedTimings = {
+		inTransitionStart: null,
+		toPartDelay: 0,
+		toPartPostroll: 0,
+		fromPartRemaining: 500,
+		fromPartPostroll: 0,
+		fromPartKeepalive: 0,
+	}
+
+	function makePartInstance(
+		id: string,
+		opts?: {
+			plannedStartedPlayback?: number
+			partPlayoutTimings?: PartCalculatedTimings
+		}
+	): DBPartInstance {
+		const { plannedStartedPlayback, partPlayoutTimings } = opts ?? {}
 		return {
 			_id: protectString<PartInstanceId>(id),
 			rundownId: protectString('rd0'),
@@ -30,7 +47,9 @@ describe('PlayoutModelImpl', () => {
 				title: id,
 				expectedDurationWithTransition: undefined,
 			},
-			...(reportedStoppedPlayback !== undefined ? { timings: { setAsNext: 0, reportedStoppedPlayback } } : {}),
+			...(plannedStartedPlayback !== undefined || partPlayoutTimings !== undefined
+				? { timings: { setAsNext: 0, plannedStartedPlayback }, partPlayoutTimings }
+				: {}),
 		}
 	}
 
@@ -149,74 +168,153 @@ describe('PlayoutModelImpl', () => {
 	})
 
 	describe('prunePreviousPartInstances', () => {
-		it('keeps all entries when none have reported stopped playback', () => {
-			const pi0 = makePartInstance('pi0') // no reportedStoppedPlayback
-			const pi1 = makePartInstance('pi1') // no reportedStoppedPlayback
-			const model = createModel([pi0, pi1], {
-				previousPartsInfo: [makeSelectedPartInfo('pi0'), makeSelectedPartInfo('pi1')],
+		// Pruning logic overview:
+		//
+		// previous[i] is dropped once its own timeline group has stopped being needed.
+		// That window is defined by the *reference* part — the part that started after previous[i] did:
+		//   - reference for previous[0] = current part
+		//   - reference for previous[i>0] = previous[i-1]
+		//
+		// previous[i]'s group lingers for `fromPartRemaining` ms after the reference started.
+		// Drop condition: now > reference.plannedStartedPlayback + reference.partPlayoutTimings.fromPartRemaining
+		//
+		// If the reference has no timing data, the entry is kept (safe default).
+		// The list is also capped at MAX_PREVIOUS_PARTS regardless.
+		// At least one entry is always retained.
+
+		const NOW = 100_000
+		const OVERLAP = 500 // fromPartRemaining used in tests
+
+		it('keeps previous[0] while its lingering window (reference: current) has not yet elapsed', () => {
+			// prev0's group lingers until current.plannedStartedPlayback + fromPartRemaining = NOW-100+500 = NOW+400 (future) → kept
+			// prev1's reference is prev0 which has no timing data → safe default keeps it too
+			const current = makePartInstance('current', {
+				plannedStartedPlayback: NOW - 100,
+				partPlayoutTimings: { ...DEFAULT_PART_TIMINGS, fromPartRemaining: OVERLAP },
+			})
+			const prev0 = makePartInstance('prev0')
+			const prev1 = makePartInstance('prev1')
+			const model = createModel([current, prev0, prev1], {
+				currentPartInfo: makeSelectedPartInfo('current'),
+				previousPartsInfo: [makeSelectedPartInfo('prev0'), makeSelectedPartInfo('prev1')],
 			})
 
-			model.prunePreviousPartInstances()
+			model.prunePreviousPartInstances(NOW)
 
-			expect(model.playlist.previousPartsInfo).toHaveLength(2)
 			expect(model.playlist.previousPartsInfo.map((p) => p.partInstanceId)).toEqual([
-				protectString('pi0'),
-				protectString('pi1'),
+				protectString('prev0'),
+				protectString('prev1'),
 			])
 		})
 
-		it('removes older entries that have reported stopped, keeps active newer ones', () => {
-			const pi0 = makePartInstance('pi0') // still running — most-recent
-			const pi1 = makePartInstance('pi1', 1000) // stopped — older
-			const model = createModel([pi0, pi1], {
-				// Most-recent first
-				previousPartsInfo: [makeSelectedPartInfo('pi0'), makeSelectedPartInfo('pi1')],
+		it('retains previous[0] as the mandatory minimum even when its lingering window has elapsed', () => {
+			// prev0 lingers until NOW-1000+500 = NOW-500 (past) → would be pruned,
+			// but the minimum-1 rule keeps it
+			const current = makePartInstance('current', {
+				plannedStartedPlayback: NOW - 1000,
+				partPlayoutTimings: { ...DEFAULT_PART_TIMINGS, fromPartRemaining: OVERLAP },
+			})
+			const prev0 = makePartInstance('prev0')
+			const model = createModel([current, prev0], {
+				currentPartInfo: makeSelectedPartInfo('current'),
+				previousPartsInfo: [makeSelectedPartInfo('prev0')],
 			})
 
-			model.prunePreviousPartInstances()
+			model.prunePreviousPartInstances(NOW)
 
 			expect(model.playlist.previousPartsInfo).toHaveLength(1)
-			expect(model.playlist.previousPartsInfo[0].partInstanceId).toEqual(protectString('pi0'))
+			expect(model.playlist.previousPartsInfo[0].partInstanceId).toEqual(protectString('prev0'))
 		})
 
-		it('always keeps at least one entry even if all have reported stopped', () => {
-			const pi0 = makePartInstance('pi0', 2000) // stopped — most-recent
-			const pi1 = makePartInstance('pi1', 1000) // stopped — older
-			const model = createModel([pi0, pi1], {
-				previousPartsInfo: [makeSelectedPartInfo('pi0'), makeSelectedPartInfo('pi1')],
+		it('drops previous[1] once its lingering window (reference: previous[0]) has elapsed', () => {
+			// prev0 lingers until NOW-100+500 = NOW+400 (future) → previous[0] kept
+			// prev1 lingers until NOW-2000+500 = NOW-1500 (past) → previous[1] dropped
+			const current = makePartInstance('current', {
+				plannedStartedPlayback: NOW - 100,
+				partPlayoutTimings: { ...DEFAULT_PART_TIMINGS, fromPartRemaining: OVERLAP },
+			})
+			const prev0 = makePartInstance('prev0', {
+				plannedStartedPlayback: NOW - 2000,
+				partPlayoutTimings: { ...DEFAULT_PART_TIMINGS, fromPartRemaining: OVERLAP },
+			})
+			const prev1 = makePartInstance('prev1')
+			const model = createModel([current, prev0, prev1], {
+				currentPartInfo: makeSelectedPartInfo('current'),
+				previousPartsInfo: [makeSelectedPartInfo('prev0'), makeSelectedPartInfo('prev1')],
 			})
 
-			model.prunePreviousPartInstances()
+			model.prunePreviousPartInstances(NOW)
 
-			// Must not drop to zero — keep index 0 (the most-recent)
 			expect(model.playlist.previousPartsInfo).toHaveLength(1)
-			expect(model.playlist.previousPartsInfo[0].partInstanceId).toEqual(protectString('pi0'))
+			expect(model.playlist.previousPartsInfo[0].partInstanceId).toEqual(protectString('prev0'))
 		})
 
-		it('keeps entries whose PartInstance is not loaded (unknown state — safe default)', () => {
-			// pi0 is NOT passed as a loaded part instance, so it is unknown
-			const model = createModel([], {
-				previousPartsInfo: [makeSelectedPartInfo('pi0')],
+		it('always retains previous[0] even when all lingering windows have elapsed', () => {
+			// prev0 lingers until NOW-1000+500 = NOW-500 (past) → would be pruned
+			// prev1 lingers until NOW-2000+500 = NOW-1500 (past) → would be pruned
+			// minimum-1 rule saves previous[0]
+			const current = makePartInstance('current', {
+				plannedStartedPlayback: NOW - 1000,
+				partPlayoutTimings: { ...DEFAULT_PART_TIMINGS, fromPartRemaining: OVERLAP },
+			})
+			const prev0 = makePartInstance('prev0', {
+				plannedStartedPlayback: NOW - 2000,
+				partPlayoutTimings: { ...DEFAULT_PART_TIMINGS, fromPartRemaining: OVERLAP },
+			})
+			const prev1 = makePartInstance('prev1')
+			const model = createModel([current, prev0, prev1], {
+				currentPartInfo: makeSelectedPartInfo('current'),
+				previousPartsInfo: [makeSelectedPartInfo('prev0'), makeSelectedPartInfo('prev1')],
 			})
 
-			model.prunePreviousPartInstances()
+			model.prunePreviousPartInstances(NOW)
 
-			// Unknown — should be retained, not dropped
+			expect(model.playlist.previousPartsInfo).toHaveLength(1)
+			expect(model.playlist.previousPartsInfo[0].partInstanceId).toEqual(protectString('prev0'))
+		})
+
+		it('keeps all entries when the reference part has no timing data (safe default)', () => {
+			// current has no partPlayoutTimings → group end unknown → keep previous[0]
+			const current = makePartInstance('current')
+			const prev0 = makePartInstance('prev0')
+			const model = createModel([current, prev0], {
+				currentPartInfo: makeSelectedPartInfo('current'),
+				previousPartsInfo: [makeSelectedPartInfo('prev0')],
+			})
+
+			model.prunePreviousPartInstances(NOW)
+
 			expect(model.playlist.previousPartsInfo).toHaveLength(1)
 		})
 
-		it('does not change previousPartsInfo when nothing needs pruning', () => {
-			const pi0 = makePartInstance('pi0')
-			const pi1 = makePartInstance('pi1')
-			const model = createModel([pi0, pi1], {
-				previousPartsInfo: [makeSelectedPartInfo('pi0'), makeSelectedPartInfo('pi1')],
+		it('keeps all entries when there is no current part (safe default)', () => {
+			// Without a current part, previous[0] has no reference → keep it
+			const prev0 = makePartInstance('prev0')
+			const model = createModel([prev0], {
+				previousPartsInfo: [makeSelectedPartInfo('prev0')],
+			})
+
+			model.prunePreviousPartInstances(NOW)
+
+			expect(model.playlist.previousPartsInfo).toHaveLength(1)
+		})
+
+		it('does not mutate previousPartsInfo when nothing is pruned', () => {
+			const current = makePartInstance('current', {
+				plannedStartedPlayback: NOW - 100,
+				partPlayoutTimings: { ...DEFAULT_PART_TIMINGS, fromPartRemaining: OVERLAP },
+			})
+			const prev0 = makePartInstance('prev0')
+			const prev1 = makePartInstance('prev1')
+			const model = createModel([current, prev0, prev1], {
+				currentPartInfo: makeSelectedPartInfo('current'),
+				previousPartsInfo: [makeSelectedPartInfo('prev0'), makeSelectedPartInfo('prev1')],
 			})
 
 			const before = model.playlist.previousPartsInfo
 
-			model.prunePreviousPartInstances()
+			model.prunePreviousPartInstances(NOW)
 
-			// Same content
 			expect(model.playlist.previousPartsInfo).toEqual(before)
 			expect(model.playlist.previousPartsInfo).toHaveLength(2)
 		})
@@ -224,8 +322,24 @@ describe('PlayoutModelImpl', () => {
 		it('handles an empty previousPartsInfo without crashing', () => {
 			const model = createModel([], { previousPartsInfo: [] })
 
-			expect(() => model.prunePreviousPartInstances()).not.toThrow()
+			expect(() => model.prunePreviousPartInstances(NOW)).not.toThrow()
 			expect(model.playlist.previousPartsInfo).toHaveLength(0)
+		})
+
+		it('caps the list at MAX_PREVIOUS_PARTS even when no group ends are in the past', () => {
+			// 11 previous entries, all with no timing data (safe default keeps them all),
+			// but the cap should trim to 10
+			const current = makePartInstance('current')
+			const prevInstances = Array.from({ length: 11 }, (_, i) => makePartInstance(`prev${i}`))
+			const model = createModel([current, ...prevInstances], {
+				currentPartInfo: makeSelectedPartInfo('current'),
+				previousPartsInfo: prevInstances.map((p) => makeSelectedPartInfo(unprotectString(p._id))),
+			})
+
+			model.prunePreviousPartInstances(NOW)
+
+			expect(model.playlist.previousPartsInfo).toHaveLength(10)
+			expect(model.playlist.previousPartsInfo[0].partInstanceId).toEqual(protectString('prev0'))
 		})
 	})
 })
