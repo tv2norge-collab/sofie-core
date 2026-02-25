@@ -90,7 +90,27 @@ export async function getLookeaheadObjects(
 		},
 	})
 
+	// Previous parts are included oldest-first so that the timed-lookahead chain is ordered
+	// chronologically. This is necessary for WHEN_CLEAR correctness: a previous part may still
+	// have pieces that have not yet started (e.g. a delayed piece during a heavy overlap). Without
+	// including it here those pieces would not produce a timed lookahead entry, and a future part's
+	// lookahead (which runs at low priority with `while: '1'`) would incorrectly fill the gap on
+	// that layer until the real piece becomes active.
+	// `getPrunedEndedPieceInstances` already drops definitively-ended pieces, so only still-relevant
+	// pieces are included. The `classesForNext` chain threads naturally through the ordered list.
 	const partInstancesInfo: PartInstanceAndPieceInstances[] = _.compact([
+		...partInstancesInfo0.previous
+			.slice()
+			.reverse() // oldest-first so the timed chain is ordered correctly
+			.map((prevInfo) =>
+				removeInfiniteContinuations({
+					part: prevInfo.partInstance,
+					onTimeline: true,
+					nowInPart: prevInfo.nowInPart,
+					allPieces: getPrunedEndedPieceInstances(prevInfo),
+					calculatedTimings: prevInfo.calculatedTimings,
+				})
+			),
 		partInstancesInfo0.current
 			? removeInfiniteContinuations({
 					part: partInstancesInfo0.current.partInstance,
@@ -110,20 +130,6 @@ export async function getLookeaheadObjects(
 			  })
 			: undefined,
 	])
-
-	// Track the previous info for checking how the timeline will be built.
-	// Lookahead only needs the most-recent previous part (index 0) for piece-continuation checks.
-	let previousPartInfo: PartInstanceAndPieceInstances | undefined
-	const previousInfoEntry = partInstancesInfo0.previous?.[0]
-	if (previousInfoEntry) {
-		previousPartInfo = removeInfiniteContinuations({
-			part: previousInfoEntry.partInstance,
-			onTimeline: true,
-			nowInPart: previousInfoEntry.nowInPart,
-			allPieces: getPrunedEndedPieceInstances(previousInfoEntry),
-			calculatedTimings: previousInfoEntry.calculatedTimings,
-		})
-	}
 
 	// TODO: Do we need to use processAndPrunePieceInstanceTimings on these pieces? In theory yes, but that gets messy and expensive.
 	// In reality, there are not likely to be any/many conflicts if the blueprints are written well so it shouldnt be a problem
@@ -168,7 +174,6 @@ export async function getLookeaheadObjects(
 				context,
 				playoutModel.playlist.currentPartInfo?.partInstanceId ?? null,
 				partInstancesInfo,
-				previousPartInfo,
 				orderedPartInfos,
 				layerId,
 				lookaheadTargetObjects,

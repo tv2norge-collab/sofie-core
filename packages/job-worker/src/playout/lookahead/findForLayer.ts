@@ -15,7 +15,6 @@ export function findLookaheadForLayer(
 	context: JobContext,
 	currentPartInstanceId: PartInstanceId | null,
 	partInstancesInfo: PartInstanceAndPieceInstances[],
-	previousPartInstanceInfo: PartInstanceAndPieceInstances | undefined,
 	orderedPartInfos: Array<PartAndPieces>,
 	layer: string,
 	lookaheadTargetFutureObjects: number,
@@ -27,11 +26,7 @@ export function findLookaheadForLayer(
 		future: [],
 	}
 
-	// Track the previous info for checking how the timeline will be built
 	let previousPart: ReadonlyDeep<DBPart> | undefined
-	if (previousPartInstanceInfo) {
-		previousPart = previousPartInstanceInfo.part.part
-	}
 
 	// Generate timed/future objects for the partInstances
 	for (const partInstanceInfo of partInstancesInfo) {
