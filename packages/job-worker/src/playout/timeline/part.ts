@@ -161,7 +161,11 @@ export function createPartGroupFirstObject(
 		id: getPartFirstObjectId(partInstance),
 		objectType: TimelineObjType.RUNDOWN,
 		enable: { start: 0 },
-		layer: 'group_first_object',
+		// Each part gets its own virtual layer so callback objects from
+		// different parts never fight for the same layer.
+		// This means callBack fires at actual part-group start and callBackStopped
+		// fires at actual part-group end - including any postroll/keepalive overlap.
+		layer: '',
 		content: {
 			deviceType: TSR.DeviceType.ABSTRACT,
 			type: 'callback',

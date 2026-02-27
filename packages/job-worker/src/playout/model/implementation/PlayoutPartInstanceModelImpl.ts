@@ -468,8 +468,6 @@ export class PlayoutPartInstanceModelImpl implements PlayoutPartInstanceModel {
 
 		if (!timings.reportedStartedPlayback) {
 			timings.reportedStartedPlayback = time
-			delete timings.plannedStoppedPlayback
-			delete timings.duration
 
 			return this.#compareAndSetPartInstanceValue('timings', timings, true)
 		}

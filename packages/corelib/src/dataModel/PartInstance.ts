@@ -46,8 +46,9 @@ export interface PartInstanceTimings {
 	/** The playback offset that was set for the last take */
 	playOffset?: Time
 	/**
-	 * The duration this part was playing for.
-	 * This is set when the next part has started playback
+	 * The duration this part's group was active for, from reportedStartedPlayback to
+	 * reportedStoppedPlayback. Includes any postroll/keepalive overlap with the next part.
+	 * Set when reportedStoppedPlayback is recorded.
 	 */
 	duration?: Time
 
@@ -64,13 +65,17 @@ export interface PartInstanceTimings {
 	 */
 	plannedStartedPlayback?: Time
 	/**
-	 * Point in time whre the Part is planned to stop playing
-	 * This gets set when the plannedStartedPlayback of the following part is set
+	 * Point in time where the Part's group is planned to end, including any postroll/keepalive
+	 * overlap with the following part.
+	 * Set when the following part starts: plannedStartedPlayback_of_next + fromPartRemaining.
 	 */
 	plannedStoppedPlayback?: Time
 
-	/** Point in time the Part started playing (ie the time of the playout) */
+	/** Point in time the Part's group started playing, including any preroll (ie the time of the playout) */
 	reportedStartedPlayback?: Time
-	/** Point in time the Part stopped playing (ie the time of the playout) */
+	/**
+	 * Point in time the Part's group stopped playing, including any postroll/keepalive overlap
+	 * with the following part (ie the time of the playout).
+	 */
 	reportedStoppedPlayback?: Time
 }

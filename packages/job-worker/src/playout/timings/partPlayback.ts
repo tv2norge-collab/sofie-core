@@ -52,6 +52,12 @@ export async function onPartPlaybackStarted(
 			// this is the current part, it has just started playback
 			reportPartInstanceHasStarted(context, playoutModel, playingPartInstance, data.startedPlayback)
 
+			if (!playoutModel.isMultiGatewayMode) {
+				// partPlayoutTimings was stored during the take action, so fromPartRemaining is already available
+				const overlap = playingPartInstance.partInstance.partPlayoutTimings?.fromPartRemaining ?? 0
+				playoutModel.previousPartInstance?.setPlannedStoppedPlayback(data.startedPlayback + overlap)
+			}
+
 			// complete the take
 			await afterTake(context, playoutModel, playingPartInstance)
 		} else if (playlist.nextPartInfo?.partInstanceId === data.partInstanceId) {
@@ -63,6 +69,8 @@ export async function onPartPlaybackStarted(
 			reportPartInstanceHasStarted(context, playoutModel, playingPartInstance, data.startedPlayback)
 
 			// Update generated properties on the newly playing partInstance
+			// NOTE: this also populates partPlayoutTimings.fromPartRemaining on playingPartInstance,
+			// so setPlannedStoppedPlayback on the previous part must be called AFTER this.
 			const currentRundown = currentPartInstance
 				? playoutModel.getRundown(currentPartInstance.partInstance.rundownId)
 				: undefined
@@ -81,6 +89,12 @@ export async function onPartPlaybackStarted(
 				playingPartInstance,
 				currentPartInstance
 			)
+
+			if (!playoutModel.isMultiGatewayMode) {
+				// partPlayoutTimings is now populated by updatePartInstanceOnTake above
+				const overlap = playingPartInstance.partInstance.partPlayoutTimings?.fromPartRemaining ?? 0
+				playoutModel.previousPartInstance?.setPlannedStoppedPlayback(data.startedPlayback + overlap)
+			}
 
 			clearQueuedSegmentId(playoutModel, playingPartInstance.partInstance, playlist.nextPartInfo)
 			resetPreviousSegmentIfLooping(context, playoutModel) // Note: rare edgecase of auto-nexting into a loop causing reset of a segment outside of the loop; is it worth fixing?
@@ -185,11 +199,10 @@ export function reportPartInstanceHasStarted(
 		if (timestamp) {
 			partInstance.setPlannedStartedPlayback(timestamp)
 		}
-		const previousPartInstance = playoutModel.previousPartInstance
-		if (timestampUpdated && previousPartInstance) {
-			// Ensure the plannedStoppedPlayback is set for the previous partinstance too
-			previousPartInstance.setPlannedStoppedPlayback(timestamp)
-		}
+		// Note: setPlannedStoppedPlayback for the previous part is NOT called here.
+		// It must be called by the caller after partPlayoutTimings has been populated
+		// (via updatePartInstanceOnTake / storePlayoutTimingsAndPreviousEndState),
+		// since fromPartRemaining is only available after that.
 	}
 
 	// Update the playlist:
