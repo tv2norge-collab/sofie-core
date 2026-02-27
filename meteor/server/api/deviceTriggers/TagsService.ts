@@ -54,7 +54,7 @@ export class TagsService {
 			return false
 		}
 
-		const previousPartInstanceId = rundownPlaylist?.previousPartsInfo?.[0]?.partInstanceId
+		const previousPartInstanceIds = (rundownPlaylist?.previousPartsInfo ?? []).map((info) => info.partInstanceId)
 		const currentPartInstanceId = rundownPlaylist?.currentPartInfo?.partInstanceId
 		const nextPartInstanceId = rundownPlaylist?.nextPartInfo?.partInstanceId
 
@@ -64,13 +64,13 @@ export class TagsService {
 
 		const resolvedSourceLayers = applyAndValidateOverrides(showStyleBase.sourceLayersWithOverrides).obj
 
-		const inPreviousPartInstance = previousPartInstanceId
-			? this.processAndPrunePieceInstanceTimings(
-					cache.PartInstances.findOne(previousPartInstanceId)?.timings,
-					cache.PieceInstances.find({ partInstanceId: previousPartInstanceId }).fetch(),
-					resolvedSourceLayers
-			  )
-			: []
+		const inPreviousPartInstances = previousPartInstanceIds.flatMap((previousPartInstanceId) =>
+			this.processAndPrunePieceInstanceTimings(
+				cache.PartInstances.findOne(previousPartInstanceId)?.timings,
+				cache.PieceInstances.find({ partInstanceId: previousPartInstanceId }).fetch(),
+				resolvedSourceLayers
+			)
+		)
 		const inCurrentPartInstance = currentPartInstanceId
 			? this.processAndPrunePieceInstanceTimings(
 					cache.PartInstances.findOne(currentPartInstanceId)?.timings,
@@ -86,8 +86,9 @@ export class TagsService {
 			  )
 			: []
 
-		const activePieceInstances = [...inPreviousPartInstance, ...inCurrentPartInstance].filter((pieceInstance) =>
-			this.isPieceInstanceActive(pieceInstance, previousPartInstanceId, currentPartInstanceId)
+		const previousPartInstanceIdSet = new Set(previousPartInstanceIds)
+		const activePieceInstances = [...inPreviousPartInstances, ...inCurrentPartInstance].filter((pieceInstance) =>
+			this.isPieceInstanceActive(pieceInstance, previousPartInstanceIdSet, currentPartInstanceId)
 		)
 
 		const activePieceInstancesTags = new Set<string>()
@@ -143,14 +144,14 @@ export class TagsService {
 
 	private isPieceInstanceActive(
 		pieceInstance: PieceInstanceWithTimings,
-		previousPartInstanceId: PartInstanceId | undefined,
+		previousPartInstanceIds: Set<PartInstanceId>,
 		currentPartInstanceId: PartInstanceId | undefined
 	) {
 		return (
 			pieceInstance.reportedStoppedPlayback == null &&
 			pieceInstance.piece.virtual !== true &&
 			pieceInstance.disabled !== true &&
-			(pieceInstance.partInstanceId === previousPartInstanceId || // a piece from previous part instance may be active during transition
+			(previousPartInstanceIds.has(pieceInstance.partInstanceId) || // a piece from a previous part instance may be active during transition/overlap
 				pieceInstance.partInstanceId === currentPartInstanceId) &&
 			(pieceInstance.reportedStartedPlayback != null || // has been reported to have started by the Playout Gateway
 				pieceInstance.plannedStartedPlayback != null || // a time to start playing has been set by Core

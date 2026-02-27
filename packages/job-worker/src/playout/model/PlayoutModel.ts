@@ -109,7 +109,10 @@ export interface PlayoutModelReadonly extends StudioPlayoutModelBaseReadonly {
 	get previousPartInstance(): PlayoutPartInstanceModel | null
 	/**
 	 * All previously-played PartInstances that are still contributing to the timeline due to
-	 * keepalive / postroll / preroll overlap, ordered most-recent-first.
+	 * keepalive / postroll / preroll overlap.
+	 * Ordered most-recent-first, mirroring `playlist.previousPartsInfo`:
+	 * index 0 is the part most recently taken from (same as `previousPartInstance`),
+	 * index 1 the one before that, and so on.
 	 */
 	get previousPartInstances(): PlayoutPartInstanceModel[]
 	/**
