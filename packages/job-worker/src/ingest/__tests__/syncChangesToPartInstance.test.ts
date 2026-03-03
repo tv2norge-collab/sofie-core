@@ -304,7 +304,7 @@ describe('SyncChangesToPartInstancesWorker', () => {
 					manuallySelected: false,
 					consumesQueuedSegmentId: false,
 				},
-				previousPartInfo: null,
+				previousPartsInfo: [],
 				studioId: context.studioId,
 				name: 'mockName',
 				created: 0,

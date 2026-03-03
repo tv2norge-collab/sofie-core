@@ -54,7 +54,7 @@ export function applyAbPlaybackForTimeline(
 	const blueprintContext = new ShowStyleContext(
 		{
 			name: playlist.name,
-			identifier: `playlistId=${playlist._id},previousPartInstance=${playlist.previousPartInfo?.partInstanceId},currentPartInstance=${playlist.currentPartInfo?.partInstanceId},nextPartInstance=${playlist.nextPartInfo?.partInstanceId}`,
+			identifier: `playlistId=${playlist._id},previousPartInstance=${playlist.previousPartsInfo?.[0]?.partInstanceId},currentPartInstance=${playlist.currentPartInfo?.partInstanceId},nextPartInstance=${playlist.nextPartInfo?.partInstanceId}`,
 		},
 		context.studio,
 		context.getStudioBlueprintConfig(),

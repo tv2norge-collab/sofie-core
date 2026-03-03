@@ -272,12 +272,12 @@ export async function CommitIngestOperation(
 }
 
 function canRemoveSegment(
-	prevPartInstance: ReadonlyDeep<DBPartInstance> | undefined,
+	previousPartInstances: ReadonlyDeep<DBPartInstance>[],
 	currentPartInstance: ReadonlyDeep<DBPartInstance> | undefined,
 	nextPartInstance: ReadonlyDeep<DBPartInstance> | undefined,
 	segmentId: SegmentId
 ): boolean {
-	if (prevPartInstance?.segmentId === segmentId) {
+	if (previousPartInstances.some((p) => p.segmentId === segmentId)) {
 		// Don't allow removing an active rundown
 		logger.warn(`Not allowing removal of previous playing segment "${segmentId}", making segment unsynced instead`)
 		return false
@@ -644,9 +644,10 @@ async function getSelectedPartInstances(
 	playlist: DBRundownPlaylist,
 	rundownIds: Array<RundownId>
 ) {
+	const previousInfos = playlist.previousPartsInfo ?? []
 	const ids = _.compact([
 		playlist.currentPartInfo?.partInstanceId,
-		playlist.previousPartInfo?.partInstanceId,
+		...previousInfos.map((p) => p.partInstanceId),
 		playlist.nextPartInfo?.partInstanceId,
 	])
 
@@ -661,7 +662,9 @@ async function getSelectedPartInstances(
 
 	const currentPartInstance = instances.find((inst) => inst._id === playlist.currentPartInfo?.partInstanceId)
 	const nextPartInstance = instances.find((inst) => inst._id === playlist.nextPartInfo?.partInstanceId)
-	const previousPartInstance = instances.find((inst) => inst._id === playlist.previousPartInfo?.partInstanceId)
+	const previousPartInstances = previousInfos
+		.map((info) => instances.find((inst) => inst._id === info.partInstanceId))
+		.filter((inst): inst is DBPartInstance => inst !== undefined)
 
 	if (playlist.currentPartInfo?.partInstanceId && !currentPartInstance)
 		logger.error(
@@ -671,15 +674,17 @@ async function getSelectedPartInstances(
 		logger.error(
 			`playlist.nextPartInfo is set, but PartInstance "${playlist.nextPartInfo?.partInstanceId}" was not found!`
 		)
-	if (playlist.previousPartInfo?.partInstanceId && !previousPartInstance)
-		logger.error(
-			`playlist.previousPartInfo is set, but PartInstance "${playlist.previousPartInfo?.partInstanceId}" was not found!`
-		)
+	for (const info of previousInfos) {
+		if (!previousPartInstances.find((inst) => inst._id === info.partInstanceId))
+			logger.error(
+				`playlist.previousPartsInfo contains partInstanceId "${info.partInstanceId}" but PartInstance was not found!`
+			)
+	}
 
 	return {
 		currentPartInstance,
 		nextPartInstance,
-		previousPartInstance,
+		previousPartInstances,
 	}
 }
 
@@ -759,7 +764,7 @@ async function removeSegments(
 	_changedSegmentIds: ReadonlyDeep<SegmentId[]>,
 	removedSegmentIds: ReadonlyDeep<SegmentId[]>
 ) {
-	const { previousPartInstance, currentPartInstance, nextPartInstance } = await getSelectedPartInstances(
+	const { previousPartInstances, currentPartInstance, nextPartInstance } = await getSelectedPartInstances(
 		context,
 		newPlaylist,
 		rundownsInPlaylist.map((r) => r._id)
@@ -769,7 +774,7 @@ async function removeSegments(
 	const orphanDeletedSegmentIds = new Set<SegmentId>()
 	const orphanHiddenSegmentIds = new Set<SegmentId>()
 	for (const segmentId of removedSegmentIds) {
-		if (canRemoveSegment(previousPartInstance, currentPartInstance, nextPartInstance, segmentId)) {
+		if (canRemoveSegment(previousPartInstances, currentPartInstance, nextPartInstance, segmentId)) {
 			purgeSegmentIds.add(segmentId)
 		} else {
 			logger.warn(
@@ -784,7 +789,7 @@ async function removeSegments(
 		if (segment.segment.isHidden) {
 			// Blueprints want to hide the Segment
 
-			if (!canRemoveSegment(previousPartInstance, currentPartInstance, nextPartInstance, segmentId)) {
+			if (!canRemoveSegment(previousPartInstances, currentPartInstance, nextPartInstance, segmentId)) {
 				// The Segment is live, so we need to protect it from being hidden
 				logger.warn(`Cannot hide live segment ${segmentId}, it will be orphaned`)
 				switch (segment.segment.orphaned) {
@@ -805,7 +810,7 @@ async function removeSegments(
 		} else if (!orphanDeletedSegmentIds.has(segmentId) && segment.parts.length === 0) {
 			// No parts in segment
 
-			if (!canRemoveSegment(previousPartInstance, currentPartInstance, nextPartInstance, segmentId)) {
+			if (!canRemoveSegment(previousPartInstances, currentPartInstance, nextPartInstance, segmentId)) {
 				// Protect live segment from being hidden
 				logger.warn(`Cannot hide live segment ${segmentId}, it will be orphaned`)
 				orphanHiddenSegmentIds.add(segmentId)
@@ -845,10 +850,12 @@ async function removeSegments(
 	for (const segmentId of purgeSegmentIds) {
 		logger.debug(
 			`IngestModel: Removing segment "${segmentId}" (` +
-				`previousPartInfo?.partInstanceId: ${newPlaylist.previousPartInfo?.partInstanceId},` +
+				`previousPartsInfo ids: ${JSON.stringify(
+					newPlaylist.previousPartsInfo?.map((p) => p.partInstanceId)
+				)},` +
 				`currentPartInfo?.partInstanceId: ${newPlaylist.currentPartInfo?.partInstanceId},` +
 				`nextPartInfo?.partInstanceId: ${newPlaylist.nextPartInfo?.partInstanceId},` +
-				`previousPartInstance.segmentId: ${!previousPartInstance ? 'N/A' : previousPartInstance.segmentId},` +
+				`previousPartInstances segmentIds: ${JSON.stringify(previousPartInstances.map((p) => p.segmentId))},` +
 				`currentPartInstance.segmentId: ${!currentPartInstance ? 'N/A' : currentPartInstance.segmentId},` +
 				`nextPartInstance.segmentId: ${!nextPartInstance ? 'N/A' : nextPartInstance.segmentId}` +
 				`)`

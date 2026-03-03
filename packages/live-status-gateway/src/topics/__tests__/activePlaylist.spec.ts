@@ -13,7 +13,7 @@ import { PlaylistTimingType } from '@sofie-automation/blueprints-integration'
 
 function makeEmptyTestPartInstances(): SelectedPartInstances {
 	return {
-		previous: undefined,
+		previous: [],
 		current: undefined,
 		firstInSegmentPlayout: undefined,
 		inCurrentSegment: [],
