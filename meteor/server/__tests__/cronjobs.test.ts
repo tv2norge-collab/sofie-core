@@ -616,7 +616,7 @@ describe('cronjobs', () => {
 				externalId: '',
 				modified: Date.now(),
 				name: 'Rundown',
-				previousPartInfo: null,
+				previousPartsInfo: [],
 				rundownIdsInOrder: [],
 				studioId,
 				timing: {

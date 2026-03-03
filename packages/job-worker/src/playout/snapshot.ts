@@ -28,7 +28,6 @@ import { getPartId, getSegmentId } from '../ingest/lib'
 import { assertNever, getRandomId, literal } from '@sofie-automation/corelib/dist/lib'
 import { logger } from '../logging'
 import { JSONBlobParse, JSONBlobStringify } from '@sofie-automation/shared-lib/dist/lib/JSONBlob'
-import { DBRundownPlaylist } from '@sofie-automation/corelib/dist/dataModel/RundownPlaylist'
 import { RundownOrphanedReason } from '@sofie-automation/corelib/dist/dataModel/Rundown'
 import { SofieIngestDataCacheObj } from '@sofie-automation/corelib/dist/dataModel/SofieIngestDataCache'
 
@@ -546,23 +545,42 @@ function fixupImportedSelectedPartInstanceIds(
 	const fullOldKey = `${property}PartInstanceId`
 	if (fullOldKey in snapshot.playlist) {
 		const oldId = (snapshot.playlist as any)[fullOldKey] as PartInstanceId
-		snapshot.playlist.currentPartInfo = {
+		const migratedInfo = {
 			partInstanceId: oldId,
 			rundownId: partInstanceOldRundownIdMap.get(oldId) || protectString(''),
 			manuallySelected: false,
 			consumesQueuedSegmentId: false,
 		}
+		if (property === 'previous') {
+			snapshot.playlist.previousPartsInfo = [migratedInfo]
+		} else if (property === 'next') {
+			snapshot.playlist.nextPartInfo = migratedInfo
+		} else {
+			snapshot.playlist.currentPartInfo = migratedInfo
+		}
 	}
 
-	const fullNewKey: keyof DBRundownPlaylist = `${property}PartInfo`
-
-	const snapshotInfo = snapshot.playlist[fullNewKey]
-	if (snapshotInfo) {
-		snapshot.playlist[fullNewKey] = {
-			partInstanceId: partInstanceIdMap.get(snapshotInfo.partInstanceId) || snapshotInfo.partInstanceId,
-			rundownId: rundownIdMap.get(snapshotInfo.rundownId) || snapshotInfo.rundownId,
-			manuallySelected: snapshotInfo.manuallySelected,
-			consumesQueuedSegmentId: snapshotInfo.consumesQueuedSegmentId,
+	if (property === 'previous') {
+		// previousPartsInfo is an array — remap each entry
+		const snapshotInfos = snapshot.playlist.previousPartsInfo
+		if (snapshotInfos?.length) {
+			snapshot.playlist.previousPartsInfo = snapshotInfos.map((snapshotInfo) => ({
+				partInstanceId: partInstanceIdMap.get(snapshotInfo.partInstanceId) || snapshotInfo.partInstanceId,
+				rundownId: rundownIdMap.get(snapshotInfo.rundownId) || snapshotInfo.rundownId,
+				manuallySelected: snapshotInfo.manuallySelected,
+				consumesQueuedSegmentId: snapshotInfo.consumesQueuedSegmentId,
+			}))
+		}
+	} else {
+		const fullNewKey = `${property}PartInfo` as const
+		const snapshotInfo = snapshot.playlist[fullNewKey]
+		if (snapshotInfo) {
+			snapshot.playlist[fullNewKey] = {
+				partInstanceId: partInstanceIdMap.get(snapshotInfo.partInstanceId) || snapshotInfo.partInstanceId,
+				rundownId: rundownIdMap.get(snapshotInfo.rundownId) || snapshotInfo.rundownId,
+				manuallySelected: snapshotInfo.manuallySelected,
+				consumesQueuedSegmentId: snapshotInfo.consumesQueuedSegmentId,
+			}
 		}
 	}
 }

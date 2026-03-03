@@ -1409,9 +1409,9 @@ export function RundownView(props: Readonly<IProps>): JSX.Element {
 			fields: {
 				currentPartInfo: 1,
 				nextPartInfo: 1,
-				previousPartInfo: 1,
+				previousPartsInfo: 1,
 			},
-		}) as Pick<DBRundownPlaylist, '_id' | 'currentPartInfo' | 'nextPartInfo' | 'previousPartInfo'> | undefined
+		}) as Pick<DBRundownPlaylist, '_id' | 'currentPartInfo' | 'nextPartInfo' | 'previousPartsInfo'> | undefined
 		if (playlist) {
 			const rundownIds = RundownPlaylistCollectionUtil.getRundownUnorderedIDs(playlist)
 			// Use meteorSubscribe so that this subscription doesn't mess with this.subscriptionsReady()
@@ -1423,7 +1423,7 @@ export function RundownView(props: Readonly<IProps>): JSX.Element {
 				[
 					playlist.currentPartInfo?.partInstanceId,
 					playlist.nextPartInfo?.partInstanceId,
-					playlist.previousPartInfo?.partInstanceId,
+					playlist.previousPartsInfo?.[0]?.partInstanceId,
 				].filter((p): p is PartInstanceId => p !== null),
 				{}
 			)

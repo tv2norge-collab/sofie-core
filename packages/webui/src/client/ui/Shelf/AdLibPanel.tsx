@@ -128,7 +128,7 @@ function actionToAdLibPieceUi(
 interface IFetchAndFilterProps {
 	playlist: Pick<
 		DBRundownPlaylist,
-		'_id' | 'currentPartInfo' | 'nextPartInfo' | 'previousPartInfo' | 'rundownIdsInOrder'
+		'_id' | 'currentPartInfo' | 'nextPartInfo' | 'previousPartsInfo' | 'rundownIdsInOrder'
 	>
 	showStyleBase: Pick<UIShowStyleBase, '_id' | 'sourceLayers' | 'outputLayers'>
 	filter?: RundownLayoutFilterBase
@@ -146,7 +146,7 @@ export function useFetchAndFilter(
 			fetchAndFilter({
 				playlist: playlist as Pick<
 					DBRundownPlaylist,
-					'_id' | 'studioId' | 'currentPartInfo' | 'nextPartInfo' | 'previousPartInfo' | 'rundownIdsInOrder'
+					'_id' | 'studioId' | 'currentPartInfo' | 'nextPartInfo' | 'previousPartsInfo' | 'rundownIdsInOrder'
 				>,
 				showStyleBase: showStyleBase as Pick<UIShowStyleBase, '_id' | 'sourceLayers' | 'outputLayers'>,
 				filter,
@@ -157,7 +157,7 @@ export function useFetchAndFilter(
 			playlist.studioId,
 			playlist.currentPartInfo?.partInstanceId,
 			playlist.nextPartInfo?.partInstanceId,
-			playlist.previousPartInfo?.partInstanceId,
+			playlist.previousPartsInfo?.[0]?.partInstanceId,
 			playlist.rundownIdsInOrder,
 			showStyleBase._id,
 			showStyleBase.sourceLayers,

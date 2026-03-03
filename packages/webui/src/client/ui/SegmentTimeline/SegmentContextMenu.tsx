@@ -67,7 +67,7 @@ export const SegmentContextMenu = withTranslation()(
 				isSegmentEditAble &&
 				part?.instance._id !== this.props.playlist.currentPartInfo?.partInstanceId &&
 				part?.instance._id !== this.props.playlist.nextPartInfo?.partInstanceId &&
-				part?.instance._id !== this.props.playlist.previousPartInfo?.partInstanceId
+				part?.instance._id !== this.props.playlist.previousPartsInfo?.[0]?.partInstanceId
 
 			const canSetAsNext = !!this.props.playlist?.activationId
 

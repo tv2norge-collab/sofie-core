@@ -235,7 +235,7 @@ export function produceRundownPlaylistInfoFromRundown(
 			created: getCurrentTime(),
 			currentPartInfo: null,
 			nextPartInfo: null,
-			previousPartInfo: null,
+			previousPartsInfo: [],
 			rundownIdsInOrder: [],
 
 			...clone<DBRundownPlaylist | undefined>(existingPlaylist),
@@ -332,7 +332,7 @@ function defaultPlaylistForRundown(
 		created: getCurrentTime(),
 		currentPartInfo: null,
 		nextPartInfo: null,
-		previousPartInfo: null,
+		previousPartsInfo: [],
 		rundownIdsInOrder: [],
 
 		...clone<DBRundownPlaylist | undefined>(existingPlaylist),
