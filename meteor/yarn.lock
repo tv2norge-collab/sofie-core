@@ -1411,7 +1411,7 @@ __metadata:
   dependencies:
     "@mos-connection/model": "npm:^5.0.0-alpha.0"
     kairos-lib: "npm:^0.2.3"
-    timeline-state-resolver-types: "npm:10.0.0-nightly-release-26-03-20260212-104218-c1745408c.0"
+    timeline-state-resolver-types: "npm:10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0"
     tslib: "npm:^2.8.1"
     type-fest: "npm:^4.41.0"
   languageName: node
@@ -9831,13 +9831,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"timeline-state-resolver-types@npm:10.0.0-nightly-release-26-03-20260212-104218-c1745408c.0":
-  version: 10.0.0-nightly-release-26-03-20260212-104218-c1745408c.0
-  resolution: "timeline-state-resolver-types@npm:10.0.0-nightly-release-26-03-20260212-104218-c1745408c.0"
+"timeline-state-resolver-types@npm:10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0":
+  version: 10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0
+  resolution: "timeline-state-resolver-types@npm:10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0"
   dependencies:
     kairos-lib: "npm:0.2.3"
     tslib: "npm:^2.8.1"
-  checksum: 10/33dba430305d68ab78bddf697643c9da3b33d3a428e08e10efbd94afa6b6cd91b8a52eb7231846e58a622359f7b3d6314663ba6db440c96bff9a305d06692db1
+  checksum: 10/5558f4a80ebc60f3f86e76172965fce0f415cfd76fd109f0c84ad6873521a1dbe054a60e1c8d87535b2e16df3be25e637099742b38628be9c794f1701762903a
   languageName: node
   linkType: hard
 
