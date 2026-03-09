@@ -10346,16 +10346,16 @@ asn1@evs-broadcast/node-asn1:
   languageName: node
   linkType: hard
 
-"atem-state@npm:1.2.1":
-  version: 1.2.1
-  resolution: "atem-state@npm:1.2.1"
+"atem-state@npm:1.3.0":
+  version: 1.3.0
+  resolution: "atem-state@npm:1.3.0"
   dependencies:
     deepmerge: "npm:^4.3.1"
     tslib: "npm:^2.6.2"
     type-fest: "npm:^3.13.1"
   peerDependencies:
     atem-connection: 3.7
-  checksum: 10/be74a217e6310a4cadb8883b8bfe76c3df0bebbea30194deef63995c777cec72cd9017383faec7f760ce7033398ed9817ad1a3576d20075cfab56f761ecf2611
+  checksum: 10/06d1e82eb9c603c83b30007a8b972f90ba15975a069fd1696fff85e6ad70f7cb02687c8482701852864c434781177b9e40b543b015d9abb7a6dc0d6d104b11e1
   languageName: node
   linkType: hard
 
@@ -24016,7 +24016,7 @@ asn1@evs-broadcast/node-asn1:
     "@sofie-automation/shared-lib": "npm:26.3.0-2"
     debug: "npm:^4.4.3"
     influx: "npm:^5.12.0"
-    timeline-state-resolver: "npm:10.0.0-nightly-release-26-03-20260212-104218-c1745408c.0"
+    timeline-state-resolver: "npm:10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0"
     tslib: "npm:^2.8.1"
     underscore: "npm:^1.13.7"
     winston: "npm:^3.19.0"
@@ -28885,14 +28885,24 @@ asn1@evs-broadcast/node-asn1:
   languageName: node
   linkType: hard
 
-"timeline-state-resolver-api@npm:10.0.0-nightly-release-26-03-20260212-104218-c1745408c.0":
-  version: 10.0.0-nightly-release-26-03-20260212-104218-c1745408c.0
-  resolution: "timeline-state-resolver-api@npm:10.0.0-nightly-release-26-03-20260212-104218-c1745408c.0"
+"timeline-state-resolver-api@npm:10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0":
+  version: 10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0
+  resolution: "timeline-state-resolver-api@npm:10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0"
   dependencies:
     tslib: "npm:^2.8.1"
   peerDependencies:
-    timeline-state-resolver-types: 10.0.0-nightly-release-26-03-20260212-104218-c1745408c.0
-  checksum: 10/0e49376cd52fa073f2927e23aafce081e8c863a8a34c9ef178225a9735fc56e3fecb01ad25ddfe3607ddef142d416154644d3d871be768f65255ec6244eba3d1
+    timeline-state-resolver-types: 10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0
+  checksum: 10/4c1a3c19efca2ffd0a679bb2e13e418081f2b515dd49ef5bb19604bed19e8adfcf4321ba1dd38f3f741e558b6397286604b7a05ecb9e8fc4217fb3bf796b9301
+  languageName: node
+  linkType: hard
+
+"timeline-state-resolver-types@npm:10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0":
+  version: 10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0
+  resolution: "timeline-state-resolver-types@npm:10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0"
+  dependencies:
+    kairos-lib: "npm:0.2.3"
+    tslib: "npm:^2.8.1"
+  checksum: 10/5558f4a80ebc60f3f86e76172965fce0f415cfd76fd109f0c84ad6873521a1dbe054a60e1c8d87535b2e16df3be25e637099742b38628be9c794f1701762903a
   languageName: node
   linkType: hard
 
@@ -28906,13 +28916,13 @@ asn1@evs-broadcast/node-asn1:
   languageName: node
   linkType: hard
 
-"timeline-state-resolver@npm:10.0.0-nightly-release-26-03-20260212-104218-c1745408c.0":
-  version: 10.0.0-nightly-release-26-03-20260212-104218-c1745408c.0
-  resolution: "timeline-state-resolver@npm:10.0.0-nightly-release-26-03-20260212-104218-c1745408c.0"
+"timeline-state-resolver@npm:10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0":
+  version: 10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0
+  resolution: "timeline-state-resolver@npm:10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0"
   dependencies:
     "@tv2media/v-connection": "npm:^7.3.4"
     atem-connection: "npm:3.7.0"
-    atem-state: "npm:1.2.1"
+    atem-state: "npm:1.3.0"
     cacheable-lookup: "npm:^5.0.4"
     casparcg-connection: "npm:6.3.3"
     casparcg-state: "npm:3.0.4"
@@ -28932,8 +28942,8 @@ asn1@evs-broadcast/node-asn1:
     sprintf-js: "npm:^1.1.3"
     superfly-timeline: "npm:^9.2.0"
     threadedclass: "npm:^1.3.0"
-    timeline-state-resolver-api: "npm:10.0.0-nightly-release-26-03-20260212-104218-c1745408c.0"
-    timeline-state-resolver-types: "npm:10.0.0-nightly-release-26-03-20260212-104218-c1745408c.0"
+    timeline-state-resolver-api: "npm:10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0"
+    timeline-state-resolver-types: "npm:10.0.0-nightly-chore-update-atem-state-20260309-091304-dea89c910.0"
     tslib: "npm:^2.8.1"
     tv-automation-quantel-gateway-client: "npm:^3.1.7"
     type-fest: "npm:^3.13.1"
@@ -28941,7 +28951,7 @@ asn1@evs-broadcast/node-asn1:
     utf-8-validate: "npm:^6.0.6"
     ws: "npm:^8.19.0"
     xml-js: "npm:^1.6.11"
-  checksum: 10/fe76fdd9a89872c7bf1147e04300aa117f524e761f15830dd88b4e2fc32ad4ac905afa33f49fb9761b204d121f247bf048014c4c349cae02282c5457c172e33e
+  checksum: 10/8306519fb7f7ff43e9f576d5cb0f9ebc76d48309bfd02d5573f078b4fef5f66cff8e8e574baa9a09f32aefbf14df0562be3fb17da8ad3204e5edfe21f0752554
   languageName: node
   linkType: hard
 
