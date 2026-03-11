@@ -36,7 +36,7 @@ import { wrapPartToTemporaryInstance } from '@sofie-automation/meteor-lib/dist/c
 
 import { SegmentTimelineSmallPartFlag } from './SmallParts/SegmentTimelineSmallPartFlag.js'
 import { UIStateStorage } from '../../lib/UIStateStorage.js'
-import { getPartInstanceTimingId, RundownTimingContext } from '../../lib/rundownTiming.js'
+import { computeSegmentDuration, getPartInstanceTimingId, RundownTimingContext } from '../../lib/rundownTiming.js'
 import { IOutputLayer, ISourceLayer, NoteSeverity, UserEditingType } from '@sofie-automation/blueprints-integration'
 import { SegmentTimelineZoomButtons } from './SegmentTimelineZoomButtons.js'
 import { SegmentViewMode } from '../SegmentContainer/SegmentViewModes.js'
@@ -168,22 +168,7 @@ const SegmentTimelineZoom = class SegmentTimelineZoom extends React.Component<
 	}
 
 	calculateSegmentDuration(): number {
-		let total = 0
-		if (this.context?.durations) {
-			const durations = this.context.durations
-			this.props.parts.forEach((partExtended) => {
-				// total += durations.partDurations ? durations.partDurations[item._id] : (item.duration || item.renderedDuration || 1)
-				const partInstanceTimingId = getPartInstanceTimingId(partExtended.instance)
-				const duration = Math.max(
-					partExtended.instance.timings?.duration || partExtended.renderedDuration || 0,
-					durations.partDisplayDurations?.[partInstanceTimingId] || Settings.defaultDisplayDuration
-				)
-				total += duration
-			})
-		} else {
-			total = RundownUtils.getSegmentDuration(this.props.parts, true)
-		}
-		return total
+		return computeSegmentDuration(this.context.durations, this.props.parts, true)
 	}
 
 	getSegmentDuration(): number {
