@@ -21,10 +21,10 @@ import Button from 'react-bootstrap/esm/Button'
 import { stringifyError } from '@sofie-automation/shared-lib/dist/lib/stringifyError'
 import { createPrivateApiPath } from '../../url.js'
 import { UserError } from '@sofie-automation/corelib/dist/error'
-import { SnapshotItem, SnapshotType } from '@sofie-automation/meteor-lib/dist/collections/Snapshots.js'
+import { SnapshotItem, SnapshotType } from '@sofie-automation/meteor-lib/dist/collections/Snapshots'
 import { useState } from 'react'
 import { MomentFromNow } from '../../lib/Moment.js'
-import { assertNever } from '@sofie-automation/corelib/dist/lib.js'
+import { assertNever } from '@sofie-automation/corelib/dist/lib'
 
 export default function SnapshotsView(): JSX.Element {
 	const { t } = useTranslation()
