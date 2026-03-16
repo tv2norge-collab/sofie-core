@@ -1,5 +1,4 @@
 import { addMigrationSteps } from './databaseMigration'
-import { CURRENT_SYSTEM_VERSION } from './currentSystemVersion'
 import { MongoInternals } from 'meteor/mongo'
 import { Studios } from '../collections'
 import { ExpectedPackages } from '../collections'
@@ -11,17 +10,9 @@ import {
 import { BucketId, RundownId } from '@sofie-automation/corelib/dist/dataModel/Ids'
 import { assertNever, Complete } from '@sofie-automation/corelib/dist/lib'
 
-/*
- * **************************************************************************************
- *
- *  These migrations are destined for the next release
- *
- * (This file is to be renamed to the correct version number when doing the release)
- *
- * **************************************************************************************
- */
+// Release 26.03 (aka Release 53)
 
-export const addSteps = addMigrationSteps(CURRENT_SYSTEM_VERSION, [
+export const addSteps = addMigrationSteps('26.3.0', [
 	{
 		id: `Drop media manager collections`,
 		canBeRunAutomatically: true,
@@ -36,7 +27,9 @@ export const addSteps = addMigrationSteps(CURRENT_SYSTEM_VERSION, [
 				['expectedMediaItems', 'mediaWorkFlows', 'mediaWorkFlowSteps'].includes(c.name)
 			)
 			if (collectionsToDrop.length > 0) {
-				return `There are ${collectionsToDrop.length} obsolete collections to be removed: ${collectionsToDrop.map((c) => c.name).join(', ')}`
+				return `There are ${collectionsToDrop.length} obsolete collections to be removed: ${collectionsToDrop
+					.map((c) => c.name)
+					.join(', ')}`
 			}
 
 			return false
