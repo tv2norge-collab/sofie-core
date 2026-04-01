@@ -124,6 +124,7 @@ export class StudioWorkerChild {
 			this.#locks,
 			transaction,
 			this.#queueJob,
+			jobName,
 			this.#fastTrackTimeline
 		)
 
