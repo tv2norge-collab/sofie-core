@@ -56,6 +56,9 @@ export interface PrompterDataPart {
 export interface PrompterDataPiece {
 	id: PieceId
 	text: string
+	formattedText: string | undefined
+	continuationOf?: PieceId
+	startPartId?: PartId | null
 }
 export interface PrompterData {
 	title: string
@@ -264,12 +267,23 @@ export namespace PrompterAPI {
 
 						const content = piece.content as ScriptContent
 						if (!content.fullScript) continue
-						if (piecesIncluded.indexOf(piece._id) >= 0) continue // piece already included in prompter script
+						if (piecesIncluded.indexOf(piece._id) >= 0) {
+							// piece already included in prompter script - mark it as a continuation
+							partData.pieces.push({
+								id: protectString(`${partData.id}_${piece._id}_continuation`),
+								text: content.fullScript,
+								formattedText: content.fullScriptFormatted,
+								continuationOf: piece._id,
+								startPartId: piece.startPartId,
+							})
+							continue
+						}
 
 						piecesIncluded.push(piece._id)
 						partData.pieces.push({
 							id: piece._id,
 							text: content.fullScript,
+							formattedText: content.fullScriptFormatted,
 						})
 					}
 				}
@@ -279,6 +293,7 @@ export namespace PrompterAPI {
 					partData.pieces.push({
 						id: protectString(`part_${partData.id}_empty`),
 						text: '',
+						formattedText: '',
 					})
 				}
 

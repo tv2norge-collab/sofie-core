@@ -40,6 +40,8 @@ export interface RundownTimelineTimingContext {
 
 	nextPartGroup?: TimelineObjGroupPart
 	nextPartOverlap?: number
+
+	multiGatewayMode: boolean
 }
 export interface RundownTimelineResult {
 	timeline: (TimelineObjRundown & OnGenerateTimelineObjExt)[]
@@ -49,7 +51,8 @@ export interface RundownTimelineResult {
 export function buildTimelineObjsForRundown(
 	context: JobContext,
 	activePlaylist: ReadonlyDeep<DBRundownPlaylist>,
-	partInstancesInfo: SelectedPartInstancesTimelineInfo
+	partInstancesInfo: SelectedPartInstancesTimelineInfo,
+	multiGatewayMode: boolean
 ): RundownTimelineResult {
 	const span = context.startSpan('buildTimelineObjsForRundown')
 	const timelineObjs: Array<TimelineObjRundown & OnGenerateTimelineObjExt> = []
@@ -139,6 +142,7 @@ export function buildTimelineObjsForRundown(
 	const timingContext: RundownTimelineTimingContext = {
 		currentPartGroup,
 		currentPartDuration: currentPartEnable.duration,
+		multiGatewayMode,
 	}
 
 	// Start generating objects
@@ -189,7 +193,10 @@ export function buildTimelineObjsForRundown(
 			currentPartGroup,
 			partInstancesInfo.current,
 			partInstancesInfo.next?.calculatedTimings ?? null,
-			activePlaylist.holdState === RundownHoldState.ACTIVE
+			{
+				isRehearsal: !!activePlaylist.rehearsal,
+				isInHold: activePlaylist.holdState === RundownHoldState.ACTIVE,
+			}
 		)
 	)
 
@@ -275,6 +282,16 @@ function generateCurrentInfinitePieceObjects(
 		return []
 	}
 
+	/*
+	   Notes on the "Infinite Part Group":
+	   Infinite pieces are put into a parent "infinite Part Group" object instead of the usual Part Group,
+	   because their lifetime can be outside of their Part.
+	   
+	   The Infinite Part Group's start time is set to be the start time of the Piece, but this is then complicated by
+	   the Piece.enable.start assuming that it is relative to the PartGroup it is in. This is being factored in if an
+	   absolute start time is known for the piece.
+	*/
+
 	const { infiniteGroupEnable, pieceEnable, nowInParent } = calculateInfinitePieceEnable(
 		currentPartInfo,
 		timingContext,
@@ -317,8 +334,11 @@ function generateCurrentInfinitePieceObjects(
 			pieceEnable,
 			0,
 			groupClasses,
-			isInHold,
-			isOriginOfInfinite
+			{
+				isRehearsal: !!activePlaylist.rehearsal,
+				isInHold: isInHold,
+				includeWhenNotInHoldObjects: isOriginOfInfinite,
+			}
 		),
 	]
 }
@@ -340,7 +360,12 @@ function calculateInfinitePieceEnable(
 	)
 
 	let infiniteGroupEnable: PartEnable = {
-		start: `#${timingContext.currentPartGroup.id}.start`, // This gets overriden with a concrete time if the original piece is known to have already started
+		/*
+			This gets overridden with a concrete time if the original piece is known to have already started
+			but if not, allows the pieceEnable to be relative to the currentPartInstance's part group as normal
+			and `nowInParent` to be correct for the piece objects inside
+		*/
+		start: `#${timingContext.currentPartGroup.id}.start`,
 	}
 
 	let nowInParent = currentPartInfo.partTimes.nowInPart // Where is 'now' inside of the infiniteGroup?
@@ -360,10 +385,10 @@ function calculateInfinitePieceEnable(
 		pieceEnable.start = 0
 
 		// Future: should this consider the prerollDuration?
-	} else if (pieceInstance.plannedStartedPlayback !== undefined) {
-		// We have a absolute start time, so we should use that.
-		let infiniteGroupStart = pieceInstance.plannedStartedPlayback
-		nowInParent = currentTime - pieceInstance.plannedStartedPlayback
+	} else if (!timingContext.multiGatewayMode && pieceInstance.reportedStartedPlayback !== undefined) {
+		// We have a absolute start time, so we should use that, but only if not in multiGatewayMode
+		let infiniteGroupStart = pieceInstance.reportedStartedPlayback
+		nowInParent = currentTime - pieceInstance.reportedStartedPlayback
 
 		// infiniteGroupStart had an actual timestamp inside and pieceEnable.start being a number
 		// means that it expects an offset from it's parent
@@ -489,7 +514,10 @@ function generatePreviousPartInstanceObjects(
 				previousPartGroup,
 				previousPartInfo,
 				currentPartInstanceTimings,
-				activePlaylist.holdState === RundownHoldState.ACTIVE
+				{
+					isRehearsal: !!activePlaylist.rehearsal,
+					isInHold: activePlaylist.holdState === RundownHoldState.ACTIVE,
+				}
 			),
 		]
 	} else {
@@ -532,7 +560,10 @@ function generateNextPartInstanceObjects(
 			nextPartGroup,
 			nextPartInfo,
 			null,
-			false
+			{
+				isRehearsal: !!activePlaylist.rehearsal,
+				isInHold: false,
+			}
 		),
 	]
 }

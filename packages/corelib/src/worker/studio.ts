@@ -127,6 +127,12 @@ export enum StudioJobs {
 	OnTimelineTriggerTime = 'onTimelineTriggerTime',
 
 	/**
+	 * Recalculate T-Timer projections based on current playlist state
+	 * Called after setNext, takes, and ingest changes to update timing anchor projections
+	 */
+	RecalculateTTimerProjections = 'recalculateTTimerProjections',
+
+	/**
 	 * Update the timeline with a regenerated Studio Baseline
 	 * Has no effect if a Playlist is active
 	 */
@@ -254,7 +260,8 @@ export interface ActivateRundownPlaylistProps extends RundownPlayoutPropsBase {
 }
 export type DeactivateRundownPlaylistProps = RundownPlayoutPropsBase
 export interface SetNextPartProps extends RundownPlayoutPropsBase {
-	nextPartId: PartId
+	nextPartId?: PartId
+	nextPartInstanceId?: PartInstanceId
 	setManually?: boolean
 	nextTimeOffset?: number
 }
@@ -266,9 +273,9 @@ export interface QueueNextSegmentProps extends RundownPlayoutPropsBase {
 }
 export type QueueNextSegmentResult = { nextPartId: PartId } | { queuedSegmentId: SegmentId | null }
 export interface ExecuteActionProps extends RundownPlayoutPropsBase {
-	actionDocId: AdLibActionId | RundownBaselineAdLibActionId | BucketAdLibActionId
+	actionDocId: AdLibActionId | RundownBaselineAdLibActionId | BucketAdLibActionId | null
 	actionId: string
-	userData: any
+	userData: any | null
 	triggerMode?: string
 	actionOptions?: { [key: string]: any }
 }
@@ -381,6 +388,10 @@ export interface CleanupOrphanedExpectedPackageReferencesProps {
 	rundownId: RundownId
 }
 
+export interface TakeNextPartResult {
+	nextTakeTime: number
+}
+
 /**
  * Set of valid functions, of form:
  * `id: (data) => return`
@@ -405,13 +416,15 @@ export type StudioJobFunc = {
 	[StudioJobs.QueueNextSegment]: (data: QueueNextSegmentProps) => QueueNextSegmentResult
 	[StudioJobs.ExecuteAction]: (data: ExecuteActionProps) => ExecuteActionResult
 	[StudioJobs.ExecuteBucketAdLibOrAction]: (data: ExecuteBucketAdLibOrActionProps) => ExecuteActionResult
-	[StudioJobs.TakeNextPart]: (data: TakeNextPartProps) => void
+	[StudioJobs.TakeNextPart]: (data: TakeNextPartProps) => TakeNextPartResult
 	[StudioJobs.DisableNextPiece]: (data: DisableNextPieceProps) => void
 	[StudioJobs.RemovePlaylist]: (data: RemovePlaylistProps) => void
 	[StudioJobs.RegeneratePlaylist]: (data: RegeneratePlaylistProps) => void
 
 	[StudioJobs.OnPlayoutPlaybackChanged]: (data: OnPlayoutPlaybackChangedProps) => void
 	[StudioJobs.OnTimelineTriggerTime]: (data: OnTimelineTriggerTimeProps) => void
+
+	[StudioJobs.RecalculateTTimerProjections]: () => void
 
 	[StudioJobs.UpdateStudioBaseline]: () => string | false
 	[StudioJobs.CleanupEmptyPlaylists]: () => void

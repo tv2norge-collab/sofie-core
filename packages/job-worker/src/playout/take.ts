@@ -40,10 +40,12 @@ import { PlayoutRundownModel } from './model/PlayoutRundownModel.js'
 import { convertNoteToNotification } from '../notifications/util.js'
 import { PersistentPlayoutStateStore } from '../blueprints/context/services/PersistantStateStore.js'
 
+import { TakeNextPartResult } from '@sofie-automation/corelib/dist/worker/studio'
+
 /**
  * Take the currently Next:ed Part (start playing it)
  */
-export async function handleTakeNextPart(context: JobContext, data: TakeNextPartProps): Promise<void> {
+export async function handleTakeNextPart(context: JobContext, data: TakeNextPartProps): Promise<TakeNextPartResult> {
 	const now = getCurrentTime()
 
 	return runJobWithPlayoutModel(
@@ -77,17 +79,29 @@ export async function handleTakeNextPart(context: JobContext, data: TakeNextPart
 				}
 			}
 			if (lastTakeTime && now - lastTakeTime < context.studio.settings.minimumTakeSpan) {
+				const nextTakeTime = lastTakeTime + context.studio.settings.minimumTakeSpan
 				logger.debug(
 					`Time since last take is shorter than ${context.studio.settings.minimumTakeSpan} for ${
 						playlist.currentPartInfo?.partInstanceId
 					}: ${now - lastTakeTime}`
 				)
-				throw UserError.create(UserErrorMessage.TakeRateLimit, {
-					duration: context.studio.settings.minimumTakeSpan,
-				})
+				throw UserError.create(
+					UserErrorMessage.TakeRateLimit,
+					{
+						duration: context.studio.settings.minimumTakeSpan,
+						nextAllowedTakeTime: nextTakeTime,
+					},
+					429
+				)
 			}
 
-			return performTakeToNextedPart(context, playoutModel, now, undefined)
+			const nextTakeTime = now + context.studio.settings.minimumTakeSpan
+
+			await performTakeToNextedPart(context, playoutModel, now, undefined)
+
+			return {
+				nextTakeTime,
+			}
 		}
 	)
 }
@@ -159,7 +173,14 @@ export async function performTakeToNextedPart(
 			logger.debug(
 				`Take is blocked until ${currentPartInstance.partInstance.blockTakeUntil}. Which is in: ${remainingTime}`
 			)
-			throw UserError.create(UserErrorMessage.TakeBlockedDuration, { duration: remainingTime })
+			throw UserError.create(
+				UserErrorMessage.TakeBlockedDuration,
+				{
+					duration: remainingTime,
+					nextAllowedTakeTime: currentPartInstance.partInstance.blockTakeUntil,
+				},
+				425
+			)
 		}
 
 		// If there was a transition from the previous Part, then ensure that has finished before another take is permitted
@@ -171,11 +192,17 @@ export async function performTakeToNextedPart(
 			start &&
 			now < start + currentPartInstance.partInstance.part.inTransition.blockTakeDuration
 		) {
-			throw UserError.create(UserErrorMessage.TakeDuringTransition)
+			throw UserError.create(
+				UserErrorMessage.TakeDuringTransition,
+				{
+					nextAllowedTakeTime: start + currentPartInstance.partInstance.part.inTransition.blockTakeDuration,
+				},
+				425
+			)
 		}
 
 		if (currentPartInstance.isTooCloseToAutonext(true)) {
-			throw UserError.create(UserErrorMessage.TakeCloseToAutonext)
+			throw UserError.create(UserErrorMessage.TakeCloseToAutonext, undefined, 425)
 		}
 	}
 
@@ -343,7 +370,8 @@ async function executeOnTakeCallback(
 		)
 		try {
 			const blueprintPersistentState = new PersistentPlayoutStateStore(
-				playoutModel.playlist.previousPersistentState
+				playoutModel.playlist.privatePlayoutPersistentState,
+				playoutModel.playlist.publicPlayoutPersistentState
 			)
 
 			await blueprint.blueprint.onTake(onSetAsNextContext, blueprintPersistentState)
@@ -353,9 +381,7 @@ async function executeOnTakeCallback(
 				partToQueueAfterTake = onSetAsNextContext.partToQueueAfterTake
 			}
 
-			if (blueprintPersistentState.hasChanges) {
-				playoutModel.setBlueprintPersistentState(blueprintPersistentState.getAll())
-			}
+			blueprintPersistentState.saveToModel(playoutModel)
 
 			for (const note of onSetAsNextContext.notes) {
 				// Update the notifications. Even though these are related to a partInstance, they will be cleared on the next take
@@ -549,7 +575,8 @@ export function updatePartInstanceOnTake(
 				takeRundown
 			)
 			const blueprintPersistentState = new PersistentPlayoutStateStore(
-				playoutModel.playlist.previousPersistentState
+				playoutModel.playlist.privatePlayoutPersistentState,
+				playoutModel.playlist.publicPlayoutPersistentState
 			)
 			previousPartEndState = blueprint.blueprint.getEndStateForPart(
 				context2,
@@ -558,9 +585,8 @@ export function updatePartInstanceOnTake(
 				resolvedPieces.map(convertResolvedPieceInstanceToBlueprints),
 				time
 			)
-			if (blueprintPersistentState.hasChanges) {
-				playoutModel.setBlueprintPersistentState(blueprintPersistentState.getAll())
-			}
+			blueprintPersistentState.saveToModel(playoutModel)
+
 			if (span) span.end()
 			logger.info(`Calculated end state in ${getCurrentTime() - time}ms`)
 		} catch (err) {

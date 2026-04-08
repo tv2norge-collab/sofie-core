@@ -52,6 +52,11 @@ export function defaultRundownPlaylist(_id: RundownPlaylistId, studioId: StudioI
 			type: 'none' as any,
 		},
 		rundownIdsInOrder: [],
+		tTimers: [
+			{ index: 1, label: '', mode: null, state: null },
+			{ index: 2, label: '', mode: null, state: null },
+			{ index: 3, label: '', mode: null, state: null },
+		],
 	}
 }
 export function defaultRundown(
@@ -116,8 +121,10 @@ export function defaultStudio(_id: StudioId): DBStudio {
 		routeSetsWithOverrides: wrapDefaultObject({}),
 		routeSetExclusivityGroupsWithOverrides: wrapDefaultObject({}),
 		packageContainersWithOverrides: wrapDefaultObject({}),
-		previewContainerIds: [],
-		thumbnailContainerIds: [],
+		packageContainerSettingsWithOverrides: wrapDefaultObject({
+			previewContainerIds: [],
+			thumbnailContainerIds: [],
+		}),
 		peripheralDeviceSettings: {
 			deviceSettings: wrapDefaultObject({}),
 			playoutDevices: wrapDefaultObject({}),

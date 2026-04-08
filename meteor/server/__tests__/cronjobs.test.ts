@@ -458,6 +458,7 @@ describe('cronjobs', () => {
 				_id: snapshot0,
 				comment: '',
 				fileName: '',
+				longname: '',
 				name: '',
 				type: SnapshotType.DEBUG,
 				version: '',
@@ -471,6 +472,7 @@ describe('cronjobs', () => {
 				comment: '',
 				fileName: '',
 				name: '',
+				longname: '',
 				type: SnapshotType.DEBUG,
 				version: '',
 				// Very old:
@@ -592,8 +594,10 @@ describe('cronjobs', () => {
 				routeSetsWithOverrides: newObjectWithOverrides({}),
 				routeSetExclusivityGroupsWithOverrides: newObjectWithOverrides({}),
 				packageContainersWithOverrides: newObjectWithOverrides({}),
-				previewContainerIds: [],
-				thumbnailContainerIds: [],
+				packageContainerSettingsWithOverrides: newObjectWithOverrides({
+					previewContainerIds: [],
+					thumbnailContainerIds: [],
+				}),
 				peripheralDeviceSettings: {
 					deviceSettings: newObjectWithOverrides({}),
 					ingestDevices: newObjectWithOverrides({}),
@@ -618,6 +622,11 @@ describe('cronjobs', () => {
 					type: PlaylistTimingType.None,
 				},
 				activationId: protectString(''),
+				tTimers: [
+					{ index: 1, label: '', mode: null, state: null },
+					{ index: 2, label: '', mode: null, state: null },
+					{ index: 3, label: '', mode: null, state: null },
+				],
 			})
 
 			return {
