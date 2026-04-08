@@ -1,0 +1,280 @@
+name: ECR Publish libraries
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v**"
+
+permissions:
+  contents: read
+
+jobs:
+  check-publish:
+    name: Check if publish is possible
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      can-publish: ${{ steps.check.outputs.can-publish }}
+
+    steps:
+      - name: Check release is possible
+        id: check
+        run: |
+          if [ -z "${{ secrets.AWS_ROLE_ARN }}" ]; then
+            echo "No AWS_ROLE_ARN set, not publishing" >> $GITHUB_STEP_SUMMARY
+            echo "can-publish=0" >> $GITHUB_OUTPUT
+          else
+            echo "CodeArtifact role configured, publishing enabled" >> $GITHUB_STEP_SUMMARY
+            echo "can-publish=1" >> $GITHUB_OUTPUT
+          fi
+
+  lint-packages:
+    name: Lint packages
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 15
+
+    needs: check-publish
+
+    if: ${{ needs.check-publish.outputs.can-publish == '1' }}
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: ".node-version"
+      - uses: ./.github/actions/setup-meteor
+      - uses: ./.github/actions/codeartifact-login
+        with:
+          account-id: ${{ secrets.AWS_ACCOUNT_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Prepare Environment
+        run: |
+          yarn config set cacheFolder /home/runner/publish-docs-cache
+          yarn install
+
+          # setup zodern:types. No linters are setup, so this simply installs the packages
+          yarn meteor lint
+
+          cd packages
+          yarn build:all
+        env:
+          CI: true
+      - name: Run typecheck and linter
+        run: |
+          cd packages
+          yarn lint
+        env:
+          CI: true
+
+  test-packages:
+    name: Test Lib
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    needs: check-publish
+
+    if: ${{ needs.check-publish.outputs.can-publish == '1' }}
+
+    permissions:
+      contents: read
+      id-token: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        package-name:
+          - blueprints-integration
+          - server-core-integration
+          - shared-lib
+          # - live-status-gateway-api # no tests yet
+          - openapi
+        node-version: [22.x]
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+      - uses: ./.github/actions/codeartifact-login
+        with:
+          account-id: ${{ secrets.AWS_ACCOUNT_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Prepare Environment
+        run: |
+          cd packages
+          yarn install
+
+          if [ "${{ matrix.package-name }}" = "openapi" ]; then
+            yarn workspace @sofie-automation/openapi run build
+          else
+            yarn build:single ${{ matrix.package-name }}/tsconfig.build.json
+          fi
+        env:
+          CI: true
+      - name: Run tests
+        run: |
+          cd packages/${{ matrix.package-name }}
+          yarn unit
+        env:
+          CI: true
+
+  prepare-publish:
+    name: Prepare for publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    needs: check-publish
+
+    if: ${{ needs.check-publish.outputs.can-publish == '1' }}
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: ".node-version"
+      - uses: ./.github/actions/setup-meteor
+      - uses: ./.github/actions/codeartifact-login
+        with:
+          account-id: ${{ secrets.AWS_ACCOUNT_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Prepare Environment
+        run: |
+          yarn config set cacheFolder /home/runner/lint-core-cache
+          yarn
+
+          # setup zodern:types. No linters are setup, so this simply installs the packages
+          yarn meteor lint
+        env:
+          CI: true
+      - name: Bump version
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          cd packages
+          COMMIT_TIMESTAMP=$(git log -1 --pretty=format:%ct HEAD)
+          COMMIT_DATE=$(date -d @$COMMIT_TIMESTAMP +%Y%m%d-%H%M%S)
+          GIT_HASH=$(git rev-parse --short HEAD)
+          PRERELEASE_TAG=nightly-$(echo "${{ github.ref_name }}" | sed -r 's/[^a-z0-9]+/-/gi')
+
+          git config --global user.email "info@superfly.tv"
+          git config --global user.name "superflytvab"
+
+          yarn set-version-and-commit prerelease --preid $PRERELEASE_TAG-$COMMIT_DATE-$GIT_HASH
+        env:
+          CI: true
+      - name: Build
+        run: |
+          cd packages
+          yarn build
+        env:
+          CI: true
+      - name: Build OpenAPI client library
+        run: |
+          cd packages/openapi
+          yarn build
+        env:
+          CI: true
+      - name: Modify dependencies to use npm packages
+        run: |
+          node scripts/prepublish.js "${{ github.repository }}"
+
+          cd packages
+          yarn install --no-immutable
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: publish-dist
+          path: |
+            packages/*/dist
+            packages/*/package.json
+            packages/package.json
+            packages/yarn.lock
+            package.json
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    name: Publish to CodeArtifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - prepare-publish
+      - test-packages
+
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: ".node-version"
+      - uses: ./.github/actions/codeartifact-login
+        with:
+          account-id: ${{ secrets.AWS_ACCOUNT_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Download release artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: publish-dist
+
+      - name: Publish to CodeArtifact
+        id: publish-npm
+        run: |
+          # Commit any changes, to make lerna happy that the tree isn't dirty
+          git config --global user.email "info@superfly.tv"
+          git config --global user.name "superflytvab"
+          git add .
+          git commit -m "chore: temp commit" --no-verify --allow-empty
+
+          # make dependencies of `determine-npm-tag` available
+          yarn install --mode=skip-build
+
+          cd packages
+
+          yarn install
+
+          NPM_TAG=nightly
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            PACKAGE_NAME=$(node -p "require('./shared-lib/package.json').name")
+            PUBLISHED_VERSION=$(yarn npm info --json $PACKAGE_NAME | jq -c '.version' -r)
+            THIS_VERSION=$(node -p "require('./lerna.json').version")
+            NPM_TAG=$(node ../scripts/determine-npm-tag.js "$PUBLISHED_VERSION" "$THIS_VERSION")
+          fi
+
+          yarn lerna publish from-package --tag-version-prefix='' --dist-tag $NPM_TAG --yes --no-verify-access
+
+          NEW_VERSION=$(node -p "require('./lerna.json').version")
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "**Published:** $NEW_VERSION as $NPM_TAG" >> $GITHUB_STEP_SUMMARY
+        env:
+          CI: true

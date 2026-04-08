@@ -1,8 +1,11 @@
-name: Node CI
+name: ECR Node CI
 
 on:
-  workflow_dispatch:
-
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v**"
 permissions:
   contents: read
 
@@ -11,6 +14,9 @@ jobs:
     name: Typecheck and Lint Core
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -28,10 +34,13 @@ jobs:
             meteor/node_modules
             packages/node_modules
           key: ${{ runner.os }}-${{ hashFiles('yarn.lock', 'meteor/yarn.lock', 'meteor/.meteor/release', 'packages/yarn.lock') }}
+      - uses: ./.github/actions/codeartifact-login
+        with:
+          account-id: ${{ secrets.AWS_ACCOUNT_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
       - name: Prepare Environment
         run: |
-          corepack enable
-
           yarn config set cacheFolder /home/runner/lint-core-cache
           yarn
 
@@ -52,6 +61,9 @@ jobs:
     name: Test Core
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -69,10 +81,13 @@ jobs:
             meteor/node_modules
             packages/node_modules
           key: ${{ runner.os }}-${{ hashFiles('yarn.lock', 'meteor/yarn.lock', 'meteor/.meteor/release', 'packages/yarn.lock') }}
+      - uses: ./.github/actions/codeartifact-login
+        with:
+          account-id: ${{ secrets.AWS_ACCOUNT_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
       - name: Prepare Environment
         run: |
-          corepack enable
-
           yarn config set cacheFolder /home/runner/test-core-cache
           yarn
 
@@ -95,15 +110,13 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   build-core:
-    # TODO - should this be dependant on tests or something passing if we are on a tag?
     name: Build Core and publish docker image
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
     permissions:
       contents: read
       packages: write
-
+      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -121,15 +134,17 @@ jobs:
             meteor/node_modules
             packages/node_modules
           key: ${{ runner.os }}-${{ hashFiles('yarn.lock', 'meteor/yarn.lock', 'meteor/.meteor/release', 'packages/yarn.lock') }}
+      - uses: ./.github/actions/codeartifact-login
+        with:
+          account-id: ${{ secrets.AWS_ACCOUNT_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
       - name: Prepare Environment
         run: |
-          corepack enable
-
           yarn install
 
           # setup zodern:types. No linters are setup, so this simply installs the packages
           yarn meteor lint
-
       - name: Build libs
         run: |
           yarn build:packages
@@ -156,129 +171,51 @@ jobs:
           meteor npm install
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-
-      # Check how the image should be built and pushed
-      - name: Determine if images should be published to DockerHub
-        id: dockerhub
-        run: |
-          # check if a release branch, or main, or a tag
-          if [[ "${{ github.ref }}" =~ ^refs/heads/release([0-9]+)$ || "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == refs/tags/* ]]
-          then
-            DOCKERHUB_PUBLISH="1"
-          else
-            DOCKERHUB_PUBLISH="0"
-          fi
-          # debug output
-          echo "dockerhub-publish $DOCKERHUB_PUBLISH"
-          echo "dockerhub-publish=$DOCKERHUB_PUBLISH" >> $GITHUB_OUTPUT
-      - name: Check if push to GHCR is enabled
-        id: check-ghcr
-        env:
-          GHCR_ENABLED: ${{ secrets.GHCR_ENABLED }}
-        run: |
-          echo "Enable push to GHCR: ${{ env.GHCR_ENABLED != '' }}"
-          echo "enable=${{ env.GHCR_ENABLED != '' }}" >> $GITHUB_OUTPUT
-      - name: Check if there is access to repo secrets (needed for build and push)
-        if: steps.dockerhub.outputs.dockerhub-publish == '1' || steps.check-ghcr.outputs.enable == 'true'
-        id: check-build-and-push
-        env:
-          SECRET_ACCESS: ${{ secrets.DOCKERHUB_IMAGE_PREFIX }}
-        run: |
-          echo "Enable build and push: ${{ env.SECRET_ACCESS != '' }}"
-          echo "enable=${{ env.SECRET_ACCESS != '' }}" >> $GITHUB_OUTPUT
-
-      # No-push build if no destination
-      - name: Build without push
-        if: steps.check-build-and-push.outputs.enable != 'true'
-        uses: docker/build-push-action@v7
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5
         with:
-          context: .
-          file: ./meteor/Dockerfile.circle
-          push: false
-          provenance: false
-
-      # GHCR build
-      - name: Get the Docker tag for GHCR
-        id: ghcr-tag
-        if: steps.check-build-and-push.outputs.enable == 'true'
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Get the Docker tag for ECR
+        id: ecr-tag
         uses: docker/metadata-action@v6
         with:
-          images: |
-            ghcr.io/${{ github.repository }}-server-core
+          images: ${{ steps.login-ecr.outputs.registry }}/sofie-core
           tags: |
             type=schedule
             type=ref,event=branch
             type=ref,event=tag
             type=raw,value=latest,enable={{is_default_branch}}
-      - name: Login to GitHub Container Registry
-        if: steps.check-build-and-push.outputs.enable == 'true' && steps.check-ghcr.outputs.enable == 'true'
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push to GHCR
-        if: steps.check-build-and-push.outputs.enable == 'true' && steps.check-ghcr.outputs.enable == 'true' && steps.ghcr-tag.outputs.tags != 0
+      - name: Build and push to ECR
         uses: docker/build-push-action@v7
         with:
           context: .
           file: ./meteor/Dockerfile.circle
           push: true
           provenance: false
-          labels: ${{ steps.ghcr-tag.outputs.labels }}
-          tags: "${{ steps.ghcr-tag.outputs.tags }}"
+          labels: ${{ steps.ecr-tag.outputs.labels }}
+          tags: "${{ steps.ecr-tag.outputs.tags }}"
           github-token: ${{ github.token }}
 
-      # Dockerhub push
-      - name: Get the Docker tag for DockerHub
-        id: dockerhub-tag
-        if: steps.check-build-and-push.outputs.enable == 'true'
-        uses: docker/metadata-action@v6
-        with:
-          images: |
-            ${{ secrets.DOCKERHUB_IMAGE_PREFIX }}server-core
-          tags: |
-            type=schedule
-            type=ref,event=branch
-            type=ref,event=tag
-            type=raw,value=latest,enable={{is_default_branch}}
-      - name: Login to DockerHub
-        if: steps.check-build-and-push.outputs.enable == 'true' && steps.dockerhub.outputs.dockerhub-publish == '1'
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build and push to DockerHub
-        if: steps.check-build-and-push.outputs.enable == 'true' && steps.dockerhub.outputs.dockerhub-publish == '1'
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ./meteor/Dockerfile.circle
-          push: true
-          provenance: false
-          labels: ${{ steps.dockerhub-tag.outputs.labels }}
-          tags: ${{ steps.dockerhub-tag.outputs.tags }}
-
   build-gateways:
-    # TODO - should this be dependant on tests or something passing if we are on a tag?
     name: Build gateways
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
         gateway-name: [playout-gateway, mos-gateway, "live-status-gateway"]
-
-    permissions:
-      contents: read
-      packages: write
-
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-
       - name: Use Node.js
         uses: actions/setup-node@v6
         with:
@@ -289,10 +226,13 @@ jobs:
           path: |
             packages/node_modules
           key: ${{ runner.os }}-${{ hashFiles('packages/yarn.lock') }}
+      - uses: ./.github/actions/codeartifact-login
+        with:
+          account-id: ${{ secrets.AWS_ACCOUNT_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
       - name: Build
         run: |
-          corepack enable
-
           cd packages
           yarn install
           yarn build:single ${{ matrix.gateway-name }}/tsconfig.build.json
@@ -300,113 +240,41 @@ jobs:
           yarn workspaces focus ${{ matrix.gateway-name }} --production
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-
-      # Check how the image should be built and pushed
-      - name: Determine if images should be published to DockerHub
-        id: dockerhub
-        run: |
-          # check if a release branch, or main, or a tag
-          if [[ "${{ github.ref }}" =~ ^refs/heads/release([0-9]+)$ || "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/tags/*" ]]
-          then
-            DOCKERHUB_PUBLISH="1"
-          else
-            DOCKERHUB_PUBLISH="0"
-          fi
-          # debug output
-          echo "dockerhub-publish $DOCKERHUB_PUBLISH"
-          echo "dockerhub-publish=$DOCKERHUB_PUBLISH" >> $GITHUB_OUTPUT
-      - name: Check if push to GHCR is enabled
-        id: check-ghcr
-        env:
-          GHCR_ENABLED: ${{ secrets.GHCR_ENABLED }}
-        run: |
-          echo "Enable push to GHCR: ${{ env.GHCR_ENABLED != '' }}"
-          echo "enable=${{ env.GHCR_ENABLED != '' }}" >> $GITHUB_OUTPUT
-      - name: Check if there is access to repo secrets (needed for build and push)
-        if: steps.dockerhub.outputs.dockerhub-publish == '1' || steps.check-ghcr.outputs.enable == 'true'
-        id: check-build-and-push
-        env:
-          SECRET_ACCESS: ${{ secrets.DOCKERHUB_IMAGE_PREFIX }}
-        run: |
-          echo "Enable build and push: ${{ env.SECRET_ACCESS != '' }}"
-          echo "enable=${{ env.SECRET_ACCESS != '' }}" >> $GITHUB_OUTPUT
-
-      # No-push build if no destination
-      - name: Build without push
-        if: steps.check-build-and-push.outputs.enable != 'true'
-        uses: docker/build-push-action@v7
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5
         with:
-          context: ./packages
-          file: ./packages/${{ matrix.gateway-name }}/Dockerfile.circle
-          push: false
-          provenance: false
-
-      # GHCR build
-      - name: Get the Docker tag for GHCR
-        id: ghcr-tag
-        if: steps.check-build-and-push.outputs.enable == 'true'
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Get the Docker tag for ECR
+        id: ecr-tag
         uses: docker/metadata-action@v6
         with:
-          images: |
-            ghcr.io/${{ github.repository }}-${{ matrix.gateway-name }}
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ matrix.gateway-name }}
           tags: |
             type=schedule
             type=ref,event=branch
             type=ref,event=tag
             type=raw,value=latest,enable={{is_default_branch}}
-      - name: Login to GitHub Container Registry
-        if: steps.check-build-and-push.outputs.enable == 'true' && steps.check-ghcr.outputs.enable == 'true'
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push to GHCR
-        if: steps.check-build-and-push.outputs.enable == 'true' && steps.check-ghcr.outputs.enable == 'true' && steps.ghcr-tag.outputs.tags != 0
+      - name: Build and push to ECR
         uses: docker/build-push-action@v7
         with:
           context: ./packages
           file: ./packages/${{ matrix.gateway-name }}/Dockerfile.circle
           push: true
           provenance: false
-          labels: ${{ steps.ghcr-tag.outputs.labels }}
-          tags: "${{ steps.ghcr-tag.outputs.tags }}"
-
-      # Dockerhub push
-      - name: Get the Docker tag for DockerHub
-        id: dockerhub-tag
-        if: steps.check-build-and-push.outputs.enable == 'true'
-        uses: docker/metadata-action@v6
-        with:
-          images: |
-            ${{ secrets.DOCKERHUB_IMAGE_PREFIX }}${{ matrix.gateway-name }}
-          tags: |
-            type=schedule
-            type=ref,event=branch
-            type=ref,event=tag
-            type=raw,value=latest,enable={{is_default_branch}}
-      - name: Login to DockerHub
-        if: steps.check-build-and-push.outputs.enable == 'true' && steps.dockerhub.outputs.dockerhub-publish == '1'
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Build and push to DockerHub
-        if: steps.check-build-and-push.outputs.enable == 'true' && steps.dockerhub.outputs.dockerhub-publish == '1'
-        uses: docker/build-push-action@v7
-        with:
-          context: ./packages
-          file: ./packages/${{ matrix.gateway-name }}/Dockerfile.circle
-          push: true
-          provenance: false
-          labels: ${{ steps.dockerhub-tag.outputs.labels }}
-          tags: "${{ steps.dockerhub-tag.outputs.tags }}"
+          labels: ${{ steps.ecr-tag.outputs.labels }}
+          tags: "${{ steps.ecr-tag.outputs.tags }}"
 
   lint-packages:
     name: Lint Packages
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -424,10 +292,13 @@ jobs:
             meteor/node_modules
             packages/node_modules
           key: ${{ runner.os }}-${{ hashFiles('yarn.lock', 'meteor/yarn.lock', 'meteor/.meteor/release', 'packages/yarn.lock') }}
+      - uses: ./.github/actions/codeartifact-login
+        with:
+          account-id: ${{ secrets.AWS_ACCOUNT_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
       - name: Prepare Environment
         run: |
-          corepack enable
-
           yarn config set cacheFolder /home/runner/publish-docs-cache
           yarn install
 
@@ -449,7 +320,9 @@ jobs:
     name: Test Package ${{ matrix.package-name }} (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -461,7 +334,6 @@ jobs:
           - openapi
         node-version: [22.x]
         include:
-          # include additional configs, to run certain packages only for a certain version of node
           - node-version: 22.x
             package-name: corelib
             send-coverage: true
@@ -482,11 +354,9 @@ jobs:
             package-name: webui
             send-coverage: true
             tsconfig-name: tsconfig.json
-          # manual meteor-lib as it only needs a couple of versions
           - node-version: 22.x
             package-name: meteor-lib
             send-coverage: true
-
     steps:
       - uses: actions/checkout@v6
         with:
@@ -501,10 +371,13 @@ jobs:
           path: |
             packages/node_modules
           key: ${{ runner.os }}-${{ hashFiles('packages/yarn.lock') }}
+      - uses: ./.github/actions/codeartifact-login
+        with:
+          account-id: ${{ secrets.AWS_ACCOUNT_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
       - name: Prepare Environment
         run: |
-          corepack enable
-
           cd packages
           yarn config set cacheFolder /home/runner/test-packages-cache
           yarn install
@@ -532,6 +405,9 @@ jobs:
     name: AsyncAPI Generation
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -540,10 +416,13 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: ".node-version"
+      - uses: ./.github/actions/codeartifact-login
+        with:
+          account-id: ${{ secrets.AWS_ACCOUNT_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
       - name: Prepare Environment
         run: |
-          corepack enable
-
           cd packages
           yarn
         env:
@@ -558,10 +437,14 @@ jobs:
           yarn generate-schema-types
         env:
           CI: true
+
   openapi-generation:
     name: OpenAPI Generation
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -570,10 +453,13 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: ".node-version"
+      - uses: ./.github/actions/codeartifact-login
+        with:
+          account-id: ${{ secrets.AWS_ACCOUNT_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
       - name: Prepare Environment
         run: |
-          corepack enable
-
           cd packages
           yarn
         env:
@@ -592,59 +478,13 @@ jobs:
         env:
           CI: true
 
-  build-docs:
-    name: Build Docs
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    # This is just to ensure the docs build, another job performs the build & publish
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - name: Use Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: ".node-version"
-      - uses: ./.github/actions/setup-meteor
-      - name: restore node_modules
-        uses: actions/cache@v5
-        with:
-          path: |
-            packages/node_modules
-          key: ${{ runner.os }}-${{ hashFiles('packages/yarn.lock') }}
-      - name: Prepare Environment
-        run: |
-          corepack enable
-
-          yarn config set cacheFolder /home/runner/publish-docs-cache
-          yarn install
-
-          # setup zodern:types. No linters are setup, so this simply installs the packages
-          yarn meteor lint
-
-          cd packages
-          yarn build:all
-        env:
-          CI: true
-      - name: Run docusaurus
-        run: |
-          cd packages/documentation
-          yarn docs:build
-        env:
-          CI: true
-      - name: Run typedoc
-        run: |
-          cd packages
-          yarn docs:typedoc
-          cp docs documentation/build/typedoc -R
-        env:
-          CI: true
-
   check-for-multiple-library-versions:
     name: Check for multiple library versions
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -662,10 +502,13 @@ jobs:
             meteor/node_modules
             packages/node_modules
           key: ${{ runner.os }}-${{ hashFiles('yarn.lock', 'meteor/yarn.lock', 'meteor/.meteor/release', 'packages/yarn.lock') }}
+      - uses: ./.github/actions/codeartifact-login
+        with:
+          account-id: ${{ secrets.AWS_ACCOUNT_ID }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
       - name: Prepare Environment
         run: |
-          corepack enable
-
           yarn config set cacheFolder /home/runner/check-for-multiple-library-versions-cache
           yarn
         env:

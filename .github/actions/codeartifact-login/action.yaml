@@ -1,0 +1,42 @@
+name: CodeArtifact Login
+description: Logs into CodeArtifact and configures the token for pulling/publishing dependencies
+inputs:
+  account-id:
+    description: 'AWS account ID for CodeArtifact'
+    required: true
+  role-to-assume:
+    description: 'AWS IAM role ARN to assume for authentication'
+    required: true
+  aws-region:
+    description: 'AWS region where CodeArtifact is located'
+    required: true
+  repository:
+    description: 'CodeArtifact repository name'
+    required: false
+    default: selma-store
+  domain:
+    description: 'CodeArtifact domain name'
+    required: false
+    default: selma
+runs:
+  using: composite
+  steps:
+    - name: Enable Corepack
+      shell: bash
+      run: corepack enable
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v5
+      with:
+        role-to-assume: ${{ inputs.role-to-assume }}
+        aws-region: ${{ inputs.aws-region }}
+    - name: Login to CodeArtifact
+      shell: bash
+      run: |
+        aws codeartifact login --tool npm --repository ${{ inputs.repository }} --domain ${{ inputs.domain }} --domain-owner ${{ inputs.account-id }} --region ${{ inputs.aws-region }}
+    - name: Configure CodeArtifact Token
+      shell: bash
+      run: |
+        export CODEARTIFACT_AUTH_TOKEN=`aws codeartifact get-authorization-token --domain ${{ inputs.domain }} --domain-owner ${{ inputs.account-id }} --region ${{ inputs.aws-region }} --query authorizationToken --output text`
+        yarn config set npmRegistryServer "https://${{ inputs.domain }}-${{ inputs.account-id }}.d.codeartifact.${{ inputs.aws-region }}.amazonaws.com/npm/${{ inputs.repository }}/"
+        yarn config set 'npmRegistries["https://${{ inputs.domain }}-${{ inputs.account-id }}.d.codeartifact.${{ inputs.aws-region }}.amazonaws.com/npm/${{ inputs.repository }}/"].npmAuthToken' "${CODEARTIFACT_AUTH_TOKEN}"
+        yarn config set 'npmRegistries["https://${{ inputs.domain }}-${{ inputs.account-id }}.d.codeartifact.${{ inputs.aws-region }}.amazonaws.com/npm/${{ inputs.repository }}/"].npmAlwaysAuth' "true"
