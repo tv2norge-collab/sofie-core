@@ -529,6 +529,10 @@ components:
           type: number
           exclusiveMinimum: 0
           description: How much extra delay to add to the Now-time (used for the "multi-playout-gateway" feature). A higher value adds delays in playout, but reduces the risk of missed frames.
+        expectedLatencyCap:
+          type: number
+          exclusiveMinimum: 0
+          description: Maximum latency in ms to use when calculating expected device latency.
         preserveUnsyncedPlayingSegmentContents:
           type: boolean
           deprecated: true

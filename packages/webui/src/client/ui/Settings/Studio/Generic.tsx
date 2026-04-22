@@ -265,6 +265,16 @@ function StudioSettings({ studio }: { studio: DBStudio }): JSX.Element {
 				{(value, handleUpdate) => <IntInputControl value={value} handleUpdate={handleUpdate} />}
 			</LabelAndOverridesForInt>
 
+			<LabelAndOverridesForInt
+				label={t('Expected latency cap')}
+				item={wrappedItem}
+				itemKey={'expectedLatencyCap'}
+				overrideHelper={overrideHelper}
+				hint={t('Maximum latency in ms to use when calculating expected device latency')}
+			>
+				{(value, handleUpdate) => <IntInputControl value={value} handleUpdate={handleUpdate} />}
+			</LabelAndOverridesForInt>
+
 			<LabelAndOverridesForCheckbox
 				label={t('Allow Rundowns to be reset while on-air')}
 				item={wrappedItem}

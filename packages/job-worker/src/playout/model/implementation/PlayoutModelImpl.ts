@@ -297,6 +297,7 @@ export class PlayoutModelReadonlyImpl implements PlayoutModelReadonly {
 		return this.context.studio.settings.multiGatewayNowSafeLatency
 	}
 
+	#hasLoggedExpectedLatencyCapWarning = false
 	/**
 	 * Calculate an offset to apply to the 'now' value, to compensate for delay in playout-gateway
 	 * The intention is that any concrete value used instead of 'now' should still be just in the future for playout-gateway
@@ -309,7 +310,24 @@ export class PlayoutModelReadonlyImpl implements PlayoutModelReadonly {
 			const playoutDevices = this.peripheralDevices.filter(
 				(device) => device.type === PeripheralDeviceType.PLAYOUT
 			)
-			const worstLatency = Math.max(0, ...playoutDevices.map((device) => getExpectedLatency(device).safe))
+			const expectedLatencyCap = this.context.studio.settings.expectedLatencyCap
+			const uncappedWorstLatency = Math.max(0, ...playoutDevices.map((device) => getExpectedLatency(device).safe))
+			const isExpectedLatencyCapExceeded =
+				expectedLatencyCap !== undefined && expectedLatencyCap < uncappedWorstLatency
+
+			if (isExpectedLatencyCapExceeded && !this.#hasLoggedExpectedLatencyCapWarning) {
+				this.#hasLoggedExpectedLatencyCapWarning = true
+				logger.warn(
+					`expectedLatencyCap exceeded (cap=${expectedLatencyCap}ms, uncappedWorstLatency=${uncappedWorstLatency}ms)`
+				)
+			} else if (!isExpectedLatencyCapExceeded && this.#hasLoggedExpectedLatencyCapWarning) {
+				// Reset so a later exceedance can emit a warning again.
+				this.#hasLoggedExpectedLatencyCapWarning = false
+			}
+			const worstLatency =
+				expectedLatencyCap === undefined
+					? uncappedWorstLatency
+					: Math.min(uncappedWorstLatency, expectedLatencyCap)
 			/** Add a little more latency, to account for network latency variability */
 			const ADD_SAFE_LATENCY = this.multiGatewayNowSafeLatency || 30
 			nowOffsetLatency = worstLatency + ADD_SAFE_LATENCY
