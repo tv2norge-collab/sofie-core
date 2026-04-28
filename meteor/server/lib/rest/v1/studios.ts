@@ -210,6 +210,7 @@ export interface APIStudioSettings {
 	enablePlayFromAnywhere?: boolean
 	forceMultiGatewayMode?: boolean
 	multiGatewayNowSafeLatency?: number
+	expectedLatencyCap?: number
 	allowRundownResetOnAir?: boolean
 	preserveOrphanedSegmentPositionInRundown?: boolean
 	enableQuickLoop?: boolean

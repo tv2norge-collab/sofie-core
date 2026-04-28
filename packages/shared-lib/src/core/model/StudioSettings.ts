@@ -37,6 +37,9 @@ export interface IStudioSettings {
 	 * A higher value adds delays in playout, but reduces the risk of missed frames. */
 	multiGatewayNowSafeLatency?: number
 
+	/** Maximum latency (ms) to use when calculating expected device latency. */
+	expectedLatencyCap?: number
+
 	/** Allow resets while a rundown is on-air */
 	allowRundownResetOnAir?: boolean
 
