@@ -202,6 +202,10 @@ interface CurrentPartStatus {
 	 */
 	name: string
 	/**
+	 * Whether this part was created by an adlib
+	 */
+	createdByAdLib?: boolean
+	/**
 	 * If this part will progress to the next automatically
 	 */
 	autoNext?: boolean
@@ -343,6 +347,10 @@ interface CurrentSegmentPart {
 	 */
 	name: string
 	/**
+	 * Whether this part was created by an adlib
+	 */
+	createdByAdLib?: boolean
+	/**
 	 * If this part will progress to the next automatically
 	 */
 	autoNext?: boolean
@@ -367,6 +375,10 @@ interface PartStatus {
 	 * User-presentable name of the part
 	 */
 	name: string
+	/**
+	 * Whether this part was created by an adlib
+	 */
+	createdByAdLib?: boolean
 	/**
 	 * If this part will progress to the next automatically
 	 */
