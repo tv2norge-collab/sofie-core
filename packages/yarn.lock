@@ -6841,13 +6841,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@shuttle-lib/core@npm:0.1.3":
-  version: 0.1.3
-  resolution: "@shuttle-lib/core@npm:0.1.3"
+"@shuttle-lib/core@npm:0.0.2":
+  version: 0.0.2
+  resolution: "@shuttle-lib/core@npm:0.0.2"
   dependencies:
-    eventemitter3: "npm:^5.0.1"
-    tslib: "npm:^2.8.1"
-  checksum: 10/1b3e426df3cf9ca6f2a07d2aad9ef8e14a51feb4a76d9d26272dee309cbe92f180a5de6c047ea7c82d373eb932cbb15d5110626afa8038299863be4ce7b4ceee
+    tslib: "npm:^2.4.0"
+  checksum: 10/edbb825940fee2d5fc22fb4c8c44607f6f75197ade72204876356153a6274045efcea8f9cc6ab6a6bec08da1a65e87ea4b9e15678bbfb9721b72aa4104d29598
   languageName: node
   linkType: hard
 
@@ -7264,7 +7263,7 @@ __metadata:
     sass-embedded: "npm:^1.97.3"
     semver: "npm:^7.7.3"
     sha.js: "npm:^2.4.12"
-    shuttle-webhid: "npm:^0.1.3"
+    shuttle-webhid: "npm:0.0.2"
     type-fest: "npm:^4.41.0"
     typescript: "npm:~5.7.3"
     underscore: "npm:^1.13.7"
@@ -8918,7 +8917,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/w3c-web-hid@npm:^1.0.6":
+"@types/w3c-web-hid@npm:^1.0.3":
   version: 1.0.6
   resolution: "@types/w3c-web-hid@npm:1.0.6"
   checksum: 10/14773befa9c458b3459cdb530a8269937e623e6b72c6bd2d7f88b42f8d47c02d8a64ddc98f79c81c930b6eadf1dc1c94917b553ead72acc13c8406f65310c85d
@@ -27270,14 +27269,15 @@ asn1@evs-broadcast/node-asn1:
   languageName: node
   linkType: hard
 
-"shuttle-webhid@npm:^0.1.3":
-  version: 0.1.3
-  resolution: "shuttle-webhid@npm:0.1.3"
+"shuttle-webhid@npm:0.0.2":
+  version: 0.0.2
+  resolution: "shuttle-webhid@npm:0.0.2"
   dependencies:
-    "@shuttle-lib/core": "npm:0.1.3"
-    "@types/w3c-web-hid": "npm:^1.0.6"
-    eventemitter3: "npm:^5.0.1"
-  checksum: 10/d0e2d92df8ab9e83aeb62652c1b316681a8a4a97caca19a0477805adf90636817ad72c19a00b16247c245200f18e7b0c9d9dc57c812738e532191bf39b522daa
+    "@shuttle-lib/core": "npm:0.0.2"
+    "@types/w3c-web-hid": "npm:^1.0.3"
+    buffer: "npm:^6.0.3"
+    p-queue: "npm:^6.6.2"
+  checksum: 10/fa0d72aa0e9a8de01623d2e3394fa4ac8e0414b8daa7fdbd7249c1ef4701ee2b84da101cd2f35bc7d1ef5253e6568ab079494be9aae7a761dabaffaa8e9b6f6c
   languageName: node
   linkType: hard
 
