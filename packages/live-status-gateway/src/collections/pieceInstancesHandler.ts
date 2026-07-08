@@ -100,6 +100,9 @@ export class PieceInstancesHandler extends PublicationCollection<
 		if (!filterActive) return prunedPieceInstances
 
 		return prunedPieceInstances.filter((pieceInstance) => {
+			// a reported stop always describes something that has already happened on the playout device
+			if (pieceInstance.reportedStoppedPlayback != null) return false
+
 			const resolvedPieceInstance = resolvePrunedPieceInstance(partTimes, pieceInstance)
 
 			return (
