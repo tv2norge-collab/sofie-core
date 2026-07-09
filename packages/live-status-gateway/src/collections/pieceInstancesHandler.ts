@@ -10,6 +10,7 @@ import { CorelibPubSub } from '@sofie-automation/corelib/dist/pubsub'
 import { PartInstanceId } from '@sofie-automation/corelib/dist/dataModel/Ids'
 import {
 	createPartCurrentTimes,
+	PartCurrentTimes,
 	PieceInstanceWithTimings,
 	processAndPrunePieceInstanceTimings,
 	resolvePrunedPieceInstance,
@@ -19,6 +20,7 @@ import { SourceLayers } from '@sofie-automation/corelib/dist/dataModel/ShowStyle
 import { SelectedPartInstances } from './partInstancesHandler.js'
 import { DBPartInstance } from '@sofie-automation/corelib/dist/dataModel/PartInstance'
 import { arePropertiesDeepEqual } from '../helpers/equality.js'
+import { CoalescedDeadlineScheduler } from '../helpers/coalescedDeadlineScheduler.js'
 import { CollectionHandlers } from '../liveStatusServer.js'
 import { ReadonlyDeep } from 'type-fest'
 import { PickKeys } from '@sofie-automation/shared-lib/dist/lib/types'
@@ -39,10 +41,16 @@ type PartInstances = PickKeys<SelectedPartInstances, typeof PART_INSTANCES_KEYS>
 const SHOW_STYLE_BASE_KEYS = ['sourceLayers'] as const
 type ShowStyle = PickKeys<ShowStyleBaseExt, typeof SHOW_STYLE_BASE_KEYS>
 
+const RECOMPUTE_COALESCE_WINDOW_MS = 100
+
 export type PieceInstanceMin = Omit<ReadonlyDeep<PieceInstance>, 'reportedStartedPlayback' | 'reportedStoppedPlayback'>
 
+function omitReportedPlaybackTimings(pieceInstance: PieceInstanceWithTimings): PieceInstanceWithTimings {
+	return _.omit(pieceInstance, 'reportedStartedPlayback', 'reportedStoppedPlayback') as PieceInstanceWithTimings
+}
+
 export interface SelectedPieceInstances {
-	// Pieces reported by the Playout Gateway as active
+	// Pieces computed as currently active from the planned timings
 	active: PieceInstanceMin[]
 
 	// Pieces present in the current part instance
@@ -61,6 +69,10 @@ export class PieceInstancesHandler extends PublicationCollection<
 	private _partInstanceIds: PartInstanceId[] = []
 	private _sourceLayers: SourceLayers = {}
 	private _partInstances: PartInstances | undefined
+	/** Fires a recompute when a piece is due to start or stop being active, based on planned timings */
+	private readonly _recomputeScheduler = new CoalescedDeadlineScheduler(RECOMPUTE_COALESCE_WINDOW_MS, () =>
+		this.updateAndNotify()
+	)
 
 	constructor(logger: Logger, coreHandler: CoreHandler) {
 		super(CollectionName.PieceInstances, CorelibPubSub.pieceInstances, logger, coreHandler)
@@ -86,64 +98,97 @@ export class PieceInstancesHandler extends PublicationCollection<
 	private processAndPrunePieceInstanceTimings(
 		partInstance: DBPartInstance | undefined,
 		pieceInstances: PieceInstance[],
-		filterActive: boolean
+		filterActive: boolean,
+		now: number
 	): PieceInstanceWithTimings[] {
 		// Approximate when 'now' is in the PartInstance, so that any adlibbed Pieces will be timed roughly correctly
-		const partTimes = createPartCurrentTimes(Date.now(), partInstance?.timings?.plannedStartedPlayback)
+		const partTimes = createPartCurrentTimes(now, partInstance?.timings?.plannedStartedPlayback)
 
 		const prunedPieceInstances = processAndPrunePieceInstanceTimings(
 			this._sourceLayers,
 			pieceInstances,
 			partTimes,
 			false
-		)
+		).map(omitReportedPlaybackTimings)
 		if (!filterActive) return prunedPieceInstances
 
 		return prunedPieceInstances.filter((pieceInstance) => {
-			// a reported stop always describes something that has already happened on the playout device
-			if (pieceInstance.reportedStoppedPlayback != null) return false
+			if (pieceInstance.piece.virtual === true || pieceInstance.disabled === true) return false
 
 			const resolvedPieceInstance = resolvePrunedPieceInstance(partTimes, pieceInstance)
 
-			return (
-				resolvedPieceInstance.resolvedStart <= partTimes.nowInPart &&
-				(resolvedPieceInstance.resolvedDuration == null ||
-					resolvedPieceInstance.resolvedStart + resolvedPieceInstance.resolvedDuration >
-						partTimes.nowInPart) &&
-				pieceInstance.piece.virtual !== true &&
-				pieceInstance.disabled !== true
-			)
+			if (resolvedPieceInstance.resolvedStart > partTimes.nowInPart) {
+				this.scheduleRecomputeAt(partTimes, resolvedPieceInstance.resolvedStart)
+				return false
+			}
+			if (resolvedPieceInstance.resolvedDuration != null) {
+				const resolvedEnd = resolvedPieceInstance.resolvedStart + resolvedPieceInstance.resolvedDuration
+				if (resolvedEnd <= partTimes.nowInPart) return false
+				this.scheduleRecomputeAt(partTimes, resolvedEnd)
+			}
+			return true
 		})
+	}
+
+	/** Schedule a recompute for when the playhead will reach a point within the part */
+	private scheduleRecomputeAt(partTimes: PartCurrentTimes, timeInPart: number): void {
+		// if the part hasn't started playing, the boundary can't be anchored to a wall-clock time,
+		// but the playhead change that starts it will trigger a recompute anyway
+		if (partTimes.partStartTime == null) return
+		this._recomputeScheduler.scheduleAt(partTimes.partStartTime + timeInPart)
 	}
 
 	private updateCollectionData(): boolean {
 		if (!this._collectionData) return false
 		const collection = this.getCollectionOrFail()
 
-		// Compute active pieces for each previous part, skipping any whose plannedStoppedPlayback has passed
-		// previousPartsInfo is already pruned to only contain still-active parts; per-piece timing is handled by filterActive
-		const inPreviousPartInstances: PieceInstanceWithTimings[] = (
-			this._currentPlaylist?.previousPartsInfo ?? []
-		).flatMap((info, index) => {
-			if (!info.partInstanceId) return []
-			return this.processAndPrunePieceInstanceTimings(
-				this._partInstances?.previous[index],
-				collection.find({ partInstanceId: info.partInstanceId }),
-				true
-			)
-		})
+		const now = Date.now()
+		// all still-relevant future boundaries will be re-scheduled while filtering below
+		this._recomputeScheduler.cancel()
+
 		const inCurrentPartInstance = this._currentPlaylist?.currentPartInfo?.partInstanceId
 			? this.processAndPrunePieceInstanceTimings(
 					this._partInstances?.current,
 					collection.find({ partInstanceId: this._currentPlaylist.currentPartInfo.partInstanceId }),
-					true
+					true,
+					now
 				)
 			: []
+
+		const currentInfiniteInstanceIds = new Set(
+			_.compact(inCurrentPartInstance.map((pieceInstance) => pieceInstance.infinite?.infiniteInstanceId))
+		)
+
+		// Compute active pieces for each previous part. Its pieces can only be active until the part's
+		// plannedStoppedPlayback (mirroring the timeline's part-group nesting); per-piece timing is handled by filterActive
+		const inPreviousPartInstances: PieceInstanceWithTimings[] = (
+			this._currentPlaylist?.previousPartsInfo ?? []
+		).flatMap((info, index) => {
+			if (!info.partInstanceId) return []
+			const partInstance = this._partInstances?.previous[index]
+			const partStoppedPlayback = partInstance?.timings?.plannedStoppedPlayback
+			if (partStoppedPlayback != null) {
+				if (partStoppedPlayback <= now) return []
+				this._recomputeScheduler.scheduleAt(partStoppedPlayback)
+			}
+			return this.processAndPrunePieceInstanceTimings(
+				partInstance,
+				collection.find({ partInstanceId: info.partInstanceId }),
+				true,
+				now
+			).filter(
+				// infinites continuing in the current part have handed playback over to their copy there
+				(pieceInstance) =>
+					pieceInstance.infinite == null ||
+					!currentInfiniteInstanceIds.has(pieceInstance.infinite.infiniteInstanceId)
+			)
+		})
 		const inNextPartInstance = this._currentPlaylist?.nextPartInfo?.partInstanceId
 			? this.processAndPrunePieceInstanceTimings(
 					undefined,
 					collection.find({ partInstanceId: this._currentPlaylist.nextPartInfo.partInstanceId }),
-					false
+					false,
+					now
 				)
 			: []
 
@@ -160,8 +205,6 @@ export class PieceInstancesHandler extends PublicationCollection<
 				return !arePropertiesDeepEqual<PieceInstanceWithTimings>(inCurrentPartInstance[index], pieceInstance, [
 					'plannedStartedPlayback',
 					'plannedStoppedPlayback',
-					'reportedStartedPlayback',
-					'reportedStoppedPlayback',
 					'resolvedEndCap',
 					'priority',
 				])
@@ -177,8 +220,6 @@ export class PieceInstancesHandler extends PublicationCollection<
 				return !arePropertiesDeepEqual<PieceInstanceWithTimings>(inNextPartInstance[index], pieceInstance, [
 					'plannedStartedPlayback',
 					'plannedStoppedPlayback',
-					'reportedStartedPlayback',
-					'reportedStoppedPlayback',
 					'resolvedEndCap',
 					'priority',
 				])
@@ -190,7 +231,13 @@ export class PieceInstancesHandler extends PublicationCollection<
 		return hasAnythingChanged
 	}
 
+	close(): void {
+		super.close()
+		this._recomputeScheduler.cancel()
+	}
+
 	private clearCollectionData() {
+		this._recomputeScheduler.cancel()
 		if (!this._collectionData) return
 		this._collectionData.active = []
 		this._collectionData.currentPartInstance = []
