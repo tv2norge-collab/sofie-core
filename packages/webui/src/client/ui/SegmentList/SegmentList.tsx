@@ -57,6 +57,8 @@ const SegmentListInner = React.forwardRef<HTMLDivElement, IProps>(function Segme
 	})
 	const combinedRef = useCombinedRefs(null, ref, innerRef, inViewRef)
 	const [isHeaderDetachedStick, setHeaderDetachedStick] = useState(false)
+	const isHeaderDetachedStickRef = useRef(isHeaderDetachedStick)
+	isHeaderDetachedStickRef.current = isHeaderDetachedStick
 	const [highlight, _setHighlight] = useState(false)
 	const [useTimeOfDayCountdowns, setUseTimeOfDayCountdowns] = useState(
 		UIStateStorage.getItemBoolean(
@@ -190,10 +192,12 @@ const SegmentListInner = React.forwardRef<HTMLDivElement, IProps>(function Segme
 		const { height: partHeight } = partEl.getBoundingClientRect()
 
 		function onScroll() {
-			if (window.scrollY > absoluteTop + height - getHeaderHeight() - partHeight * 2 - 10) {
-				setHeaderDetachedStick(true)
-			} else {
-				setHeaderDetachedStick(false)
+			const stick = window.scrollY > absoluteTop + height - getHeaderHeight() - partHeight * 2 - 10
+			// Skip the dispatch entirely when unchanged: useState's setter always enqueues an
+			// update even if it will be a no-op, and this component is wrapped in React.memo,
+			// so nothing else forces a render to drain it, leaking one update per scroll event.
+			if (stick !== isHeaderDetachedStickRef.current) {
+				setHeaderDetachedStick(stick)
 			}
 		}
 
