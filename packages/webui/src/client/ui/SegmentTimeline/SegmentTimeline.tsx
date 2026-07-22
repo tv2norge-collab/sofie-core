@@ -132,6 +132,8 @@ function computeSegmentDurationFromProps(props: SegmentTimelineZoomProps): numbe
 
 function SegmentTimelineZoom(props: SegmentTimelineZoomProps): JSX.Element {
 	const [totalSegmentDuration, setTotalSegmentDuration] = useState(() => computeSegmentDurationFromProps(props))
+	const totalSegmentDurationRef = useRef(totalSegmentDuration)
+	totalSegmentDurationRef.current = totalSegmentDuration
 
 	// Store the props into a ref so that the checkTimingChange can access the latest props without needing to be re-created on every render
 	const propsRef = useRef(props)
@@ -140,7 +142,14 @@ function SegmentTimelineZoom(props: SegmentTimelineZoomProps): JSX.Element {
 	useEffect(() => {
 		const onTimeupdate = () => {
 			if (!propsRef.current.isLiveSegment) {
-				setTotalSegmentDuration(computeSegmentDurationFromProps(propsRef.current))
+				const total = computeSegmentDurationFromProps(propsRef.current)
+				// Only dispatch when the value actually changed. useState's setter always
+				// enqueues an update even when it will be a no-op, and if nothing else
+				// re-renders this component (e.g. a memoized/non-live segment), that
+				// enqueued update is never drained, leaking on every tick.
+				if (total !== totalSegmentDurationRef.current) {
+					setTotalSegmentDuration(total)
+				}
 			}
 		}
 
