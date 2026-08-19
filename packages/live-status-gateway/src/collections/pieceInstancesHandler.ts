@@ -7,7 +7,7 @@ import { CollectionName } from '@sofie-automation/corelib/dist/dataModel/Collect
 import areElementsShallowEqual from '@sofie-automation/shared-lib/dist/lib/isShallowEqual'
 import _ from 'underscore'
 import { CorelibPubSub } from '@sofie-automation/corelib/dist/pubsub'
-import { PartInstanceId } from '@sofie-automation/corelib/dist/dataModel/Ids'
+import { PartInstanceId, PieceInstanceInfiniteId } from '@sofie-automation/corelib/dist/dataModel/Ids'
 import {
 	createPartCurrentTimes,
 	PieceInstanceWithTimings,
@@ -120,25 +120,53 @@ export class PieceInstancesHandler extends PublicationCollection<
 		if (!this._collectionData) return false
 		const collection = this.getCollectionOrFail()
 
-		// Compute active pieces for each previous part, skipping any whose plannedStoppedPlayback has passed
-		// previousPartsInfo is already pruned to only contain still-active parts; per-piece timing is handled by filterActive
-		const inPreviousPartInstances: PieceInstanceWithTimings[] = (
-			this._currentPlaylist?.previousPartsInfo ?? []
-		).flatMap((info, index) => {
-			if (!info.partInstanceId) return []
-			return this.processAndPrunePieceInstanceTimings(
-				this._partInstances?.previous[index],
-				collection.find({ partInstanceId: info.partInstanceId }),
-				true
-			)
-		})
-		const inCurrentPartInstance = this._currentPlaylist?.currentPartInfo?.partInstanceId
-			? this.processAndPrunePieceInstanceTimings(
-					this._partInstances?.current,
-					collection.find({ partInstanceId: this._currentPlaylist.currentPartInfo.partInstanceId }),
-					true
-				)
+		const pieceInstancesInCurrentPartInstance = this._currentPlaylist?.currentPartInfo?.partInstanceId
+			? collection.find({ partInstanceId: this._currentPlaylist.currentPartInfo.partInstanceId })
 			: []
+		const inCurrentPartInstance = this.processAndPrunePieceInstanceTimings(
+			this._partInstances?.current,
+			pieceInstancesInCurrentPartInstance,
+			true
+		)
+
+		// An infinite Piece spanning a take exists as a separate PieceInstance in every PartInstance it plays in.
+		// The copy in the most recent PartInstance is the authoritative one, as it is the only one a stop is applied
+		// to (as a userDuration, or as a virtual Piece inserted into that PartInstance), so the older copies have to
+		// be ignored, or a stopped Piece would keep being reported as active.
+		// This is the equivalent of `mergeInfinitesIntoCurrentPart` in core.
+		const seenInfiniteInstanceIds = new Set<PieceInstanceInfiniteId>()
+		const collectInfiniteInstanceIds = (pieceInstances: PieceInstance[]) => {
+			for (const pieceInstance of pieceInstances) {
+				if (pieceInstance.infinite) seenInfiniteInstanceIds.add(pieceInstance.infinite.infiniteInstanceId)
+			}
+		}
+		collectInfiniteInstanceIds(pieceInstancesInCurrentPartInstance)
+
+		// Compute active pieces for each previous part. A previous part is kept in previousPartsInfo after it has
+		// stopped contributing to playout (core always keeps at least one entry), but its Pieces have a definite end
+		// on the timeline, so they report a stop when they stop, which is what removes them from here
+		const previousPartInstancesById = new Map(
+			(this._partInstances?.previous ?? []).map((partInstance) => [partInstance._id, partInstance])
+		)
+		const inPreviousPartInstances: PieceInstanceWithTimings[] = []
+		for (const info of this._currentPlaylist?.previousPartsInfo ?? []) {
+			if (!info.partInstanceId) continue
+
+			const pieceInstancesInPartInstance = collection.find({ partInstanceId: info.partInstanceId })
+			inPreviousPartInstances.push(
+				...this.processAndPrunePieceInstanceTimings(
+					previousPartInstancesById.get(info.partInstanceId),
+					pieceInstancesInPartInstance,
+					true
+				).filter(
+					(pieceInstance) =>
+						!pieceInstance.infinite ||
+						!seenInfiniteInstanceIds.has(pieceInstance.infinite.infiniteInstanceId)
+				)
+			)
+			collectInfiniteInstanceIds(pieceInstancesInPartInstance)
+		}
+
 		const inNextPartInstance = this._currentPlaylist?.nextPartInfo?.partInstanceId
 			? this.processAndPrunePieceInstanceTimings(
 					undefined,
