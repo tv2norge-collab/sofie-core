@@ -24,6 +24,8 @@ import { CoalescedDeadlineScheduler } from '../helpers/coalescedDeadlineSchedule
 import { CollectionHandlers } from '../liveStatusServer.js'
 import { ReadonlyDeep } from 'type-fest'
 import { PickKeys } from '@sofie-automation/shared-lib/dist/lib/types'
+import { normalizeArrayToMap } from '@sofie-automation/corelib/dist/lib'
+import { PieceLifespan } from '@sofie-automation/blueprints-integration'
 
 const PLAYLIST_KEYS = [
 	'_id',
@@ -47,6 +49,26 @@ export type PieceInstanceMin = Omit<ReadonlyDeep<PieceInstance>, 'reportedStarte
 
 function omitReportedPlaybackTimings(pieceInstance: PieceInstanceWithTimings): PieceInstanceWithTimings {
 	return _.omit(pieceInstance, 'reportedStartedPlayback', 'reportedStoppedPlayback') as PieceInstanceWithTimings
+}
+
+/**
+ * The time until which a previous PartInstance's Pieces can still be on air: its timeline group is kept alive until
+ * the group following it has been playing for `fromPartRemaining` (keepalive + postroll), mirroring what
+ * `PlayoutModel.prunePreviousPartInstances` uses to decide when a previous PartInstance is done.
+ * `referencePartInstance` is the current PartInstance for `previous[0]`, and `previous[i - 1]` for the older ones.
+ * Returns `undefined` when the boundary is unknown, in which case the part is to be treated as still lingering.
+ */
+function getPartLingersUntil(referencePartInstance: DBPartInstance | undefined): number | undefined {
+	const referenceStarted = referencePartInstance?.timings?.plannedStartedPlayback
+	const fromPartRemaining = referencePartInstance?.partPlayoutTimings?.fromPartRemaining
+	if (referenceStarted == null || fromPartRemaining == null) return undefined
+	return referenceStarted + fromPartRemaining
+}
+
+/** The PieceInstances of a single Part, with the timings needed to reason about when each of them is on air */
+interface PrunedPartPieceInstances {
+	partTimes: PartCurrentTimes
+	prunedPieceInstances: PieceInstanceWithTimings[]
 }
 
 export interface SelectedPieceInstances {
@@ -98,9 +120,8 @@ export class PieceInstancesHandler extends PublicationCollection<
 	private processAndPrunePieceInstanceTimings(
 		partInstance: DBPartInstance | undefined,
 		pieceInstances: PieceInstance[],
-		filterActive: boolean,
 		now: number
-	): PieceInstanceWithTimings[] {
+	): PrunedPartPieceInstances {
 		// Approximate when 'now' is in the PartInstance, so that any adlibbed Pieces will be timed roughly correctly
 		const partTimes = createPartCurrentTimes(now, partInstance?.timings?.plannedStartedPlayback)
 
@@ -110,8 +131,15 @@ export class PieceInstancesHandler extends PublicationCollection<
 			partTimes,
 			false
 		).map(omitReportedPlaybackTimings)
-		if (!filterActive) return prunedPieceInstances
 
+		return { partTimes, prunedPieceInstances }
+	}
+
+	/** Narrow the Pieces of a Part down to the ones that are on air, scheduling a recompute at every upcoming boundary */
+	private filterActivePieceInstances({
+		partTimes,
+		prunedPieceInstances,
+	}: PrunedPartPieceInstances): PieceInstanceWithTimings[] {
 		return prunedPieceInstances.filter((pieceInstance) => {
 			if (pieceInstance.piece.virtual === true || pieceInstance.disabled === true) return false
 
@@ -146,36 +174,52 @@ export class PieceInstancesHandler extends PublicationCollection<
 		// all still-relevant future boundaries will be re-scheduled while filtering below
 		this._recomputeScheduler.cancel()
 
-		const inCurrentPartInstance = this._currentPlaylist?.currentPartInfo?.partInstanceId
-			? this.processAndPrunePieceInstanceTimings(
-					this._partInstances?.current,
-					collection.find({ partInstanceId: this._currentPlaylist.currentPartInfo.partInstanceId }),
-					true,
-					now
-				)
-			: []
+		const currentPartInstancePieces = this.processAndPrunePieceInstanceTimings(
+			this._partInstances?.current,
+			this._currentPlaylist?.currentPartInfo?.partInstanceId
+				? collection.find({ partInstanceId: this._currentPlaylist.currentPartInfo.partInstanceId })
+				: [],
+			now
+		)
+		const inCurrentPartInstance = this.filterActivePieceInstances(currentPartInstancePieces)
 
+		// Infinites continued into the current part are played back from their copy there, whether or not that copy
+		// is on air right now, so this is deliberately derived from all of its Pieces rather than the active ones
 		const currentInfiniteInstanceIds = new Set(
-			_.compact(inCurrentPartInstance.map((pieceInstance) => pieceInstance.infinite?.infiniteInstanceId))
+			_.compact(
+				currentPartInstancePieces.prunedPieceInstances.map((pieceInstance) =>
+					pieceInstance.infinite &&
+					(pieceInstance.piece.lifespan !== PieceLifespan.WithinPart || pieceInstance.infinite.fromHold)
+						? pieceInstance.infinite.infiniteInstanceId
+						: undefined
+				)
+			)
 		)
 
-		// Compute active pieces for each previous part. Its pieces can only be active until the part's
-		// plannedStoppedPlayback (mirroring the timeline's part-group nesting); per-piece timing is handled by filterActive
-		const inPreviousPartInstances: PieceInstanceWithTimings[] = (
-			this._currentPlaylist?.previousPartsInfo ?? []
-		).flatMap((info, index) => {
+		// Compute active pieces for each previous part, up until the part stops lingering
+		// (mirroring the timeline's part-group nesting); per-piece timing is handled by filterActivePieceInstances
+		const previousPartsInfo = this._currentPlaylist?.previousPartsInfo ?? []
+		const previousPartInstances = normalizeArrayToMap(this._partInstances?.previous ?? [], '_id')
+
+		const inPreviousPartInstances: PieceInstanceWithTimings[] = previousPartsInfo.flatMap((info, index) => {
 			if (!info.partInstanceId) return []
-			const partInstance = this._partInstances?.previous[index]
-			const partStoppedPlayback = partInstance?.timings?.plannedStoppedPlayback
-			if (partStoppedPlayback != null) {
-				if (partStoppedPlayback <= now) return []
-				this._recomputeScheduler.scheduleAt(partStoppedPlayback)
+			const partInstance = previousPartInstances.get(info.partInstanceId)
+			// previous[0]'s group is kept alive relative to the current part, older ones relative to the next-newer previous part
+			const referencePartInstance =
+				index === 0
+					? this._partInstances?.current
+					: previousPartInstances.get(previousPartsInfo[index - 1].partInstanceId)
+			const lingersUntil = getPartLingersUntil(referencePartInstance)
+			if (lingersUntil != null) {
+				if (lingersUntil < now) return []
+				this._recomputeScheduler.scheduleAt(lingersUntil)
 			}
-			return this.processAndPrunePieceInstanceTimings(
-				partInstance,
-				collection.find({ partInstanceId: info.partInstanceId }),
-				true,
-				now
+			return this.filterActivePieceInstances(
+				this.processAndPrunePieceInstanceTimings(
+					partInstance,
+					collection.find({ partInstanceId: info.partInstanceId }),
+					now
+				)
 			).filter(
 				// infinites continuing in the current part have handed playback over to their copy there
 				(pieceInstance) =>
@@ -187,9 +231,8 @@ export class PieceInstancesHandler extends PublicationCollection<
 			? this.processAndPrunePieceInstanceTimings(
 					undefined,
 					collection.find({ partInstanceId: this._currentPlaylist.nextPartInfo.partInstanceId }),
-					false,
 					now
-				)
+				).prunedPieceInstances
 			: []
 
 		const active = [...inCurrentPartInstance, ...inPreviousPartInstances]
@@ -234,6 +277,13 @@ export class PieceInstancesHandler extends PublicationCollection<
 	close(): void {
 		super.close()
 		this._recomputeScheduler.cancel()
+	}
+
+	protected stopSubscription(): void {
+		// the scheduled recompute reads from the collection, which is unavailable while there is no connection to Core.
+		// Any boundary that is still relevant gets re-scheduled by `updateCollectionData` once data flows again
+		this._recomputeScheduler.cancel()
+		super.stopSubscription()
 	}
 
 	private clearCollectionData() {

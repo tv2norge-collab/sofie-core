@@ -74,6 +74,23 @@ describe('CoalescedDeadlineScheduler', () => {
 		expect(callback).toHaveBeenCalledTimes(1)
 	})
 
+	it('does not fire early for deadlines beyond the maximum timeout delay', () => {
+		const MAX_TIMEOUT_MS = 2 ** 31 - 1
+		const deadline = MAX_TIMEOUT_MS + 10 * COALESCE_WINDOW_MS
+		const callback = jest.fn()
+		const scheduler = new CoalescedDeadlineScheduler(COALESCE_WINDOW_MS, callback)
+
+		scheduler.scheduleAt(deadline)
+
+		jest.advanceTimersByTime(MAX_TIMEOUT_MS)
+		expect(callback).not.toHaveBeenCalled()
+		// the remainder is covered by a second timeout, rather than by spinning on an overflowed delay
+		expect(jest.getTimerCount()).toBe(1)
+
+		jest.advanceTimersByTime(10 * COALESCE_WINDOW_MS + COALESCE_WINDOW_MS)
+		expect(callback).toHaveBeenCalledTimes(1)
+	})
+
 	it('does not fire after cancel', () => {
 		const callback = jest.fn()
 		const scheduler = new CoalescedDeadlineScheduler(COALESCE_WINDOW_MS, callback)

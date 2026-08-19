@@ -8,6 +8,9 @@
  * time, the request is ignored — the callback is expected to re-schedule any deadlines that are
  * still in the future when it runs.
  */
+/** `setTimeout` stores its delay in a 32 bit signed int; anything above this overflows and fires immediately */
+const MAX_TIMEOUT_MS = 2 ** 31 - 1
+
 export class CoalescedDeadlineScheduler {
 	private _timeout: NodeJS.Timeout | undefined
 	private _scheduledFireTime: number | undefined
@@ -38,7 +41,8 @@ export class CoalescedDeadlineScheduler {
 	private _armTimeout(fireTime: number): void {
 		this._timeout = setTimeout(
 			() => {
-				// timers may fire marginally early; re-arm to guarantee we never run before the deadline
+				// timers may fire marginally early, and deadlines beyond MAX_TIMEOUT_MS are reached in
+				// several hops; re-arm to guarantee we never run before the deadline
 				if (Date.now() < fireTime) {
 					this._armTimeout(fireTime)
 					return
@@ -47,7 +51,7 @@ export class CoalescedDeadlineScheduler {
 				this._scheduledFireTime = undefined
 				this._callback()
 			},
-			Math.max(0, fireTime - Date.now())
+			Math.min(Math.max(0, fireTime - Date.now()), MAX_TIMEOUT_MS)
 		)
 	}
 }
