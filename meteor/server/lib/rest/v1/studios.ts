@@ -178,8 +178,9 @@ export interface StudiosRestAPI {
 	): Promise<ClientAPI.ClientResponse<void>>
 }
 
+/** Values match the `action` property of the request body, as documented in the OpenAPI definition */
 export enum StudioActionType {
-	BLUEPRINT_UPGRADE = 'blueprint_upgrade',
+	BLUEPRINT_UPGRADE = 'blueprintUpgrade',
 }
 
 export interface StudioActionBase {

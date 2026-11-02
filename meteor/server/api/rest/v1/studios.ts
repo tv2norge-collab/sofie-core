@@ -544,18 +544,18 @@ export function registerRoutes(registerRoute: APIRegisterHook<StudiosRestAPI>): 
 		}
 	)
 
-	registerRoute<{ studioId: string }, { action: StudioAction }, void>(
+	registerRoute<{ studioId: string }, { action: StudioActionType }, void>(
 		'post',
-		'/studios/{studioId}/action',
+		'/studios/:studioId/action',
 		new Map([[404, [UserErrorMessage.StudioNotFound]]]),
 		studiosAPIFactory,
 		async (serverAPI, connection, event, params, body) => {
 			const studioId = protectString<StudioId>(params.studioId)
-			const action = body.action
-			logger.info(`API POST: Studio action ${studioId} ${body.action.type}`)
+			logger.info(`API POST: Studio action ${studioId} ${body.action}`)
 
 			check(studioId, String)
-			check(action, Object)
+			check(body.action, String)
+			const action = { type: body.action } as StudioAction
 			return await serverAPI.studioAction(connection, event, studioId, action)
 		}
 	)
