@@ -24,7 +24,7 @@ import { QuickLoopMarker } from '../dataModel/RundownPlaylist.js'
 /** List of all Jobs performed by the Worker related to a certain Studio */
 export enum StudioJobs {
 	/**
-	 * Debug: Regenerate the timeline for the Studio
+	 * Regenerate the timeline for the Studio: the timeline of the active Playlist, or the Studio baseline if none is active
 	 */
 	UpdateTimeline = 'updateTimeline',
 	/**

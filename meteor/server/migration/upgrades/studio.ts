@@ -95,3 +95,21 @@ export async function updateStudioBaseline(studioId: StudioId): Promise<string |
 		span?.end()
 	}
 }
+
+/**
+ * Regenerate the timeline of the Studio: the timeline of the active Playlist, or the Studio baseline if none is active.
+ * Unlike `updateStudioBaseline`, this also takes effect while a Playlist is active.
+ */
+export async function regenerateStudioTimeline(studioId: StudioId): Promise<void> {
+	logger.info(`Running timeline update for Studio "${studioId}"`)
+	await getStudio(studioId)
+
+	const queuedJob = await QueueStudioJob(StudioJobs.UpdateTimeline, studioId, undefined)
+
+	const span = profiler.startSpan('queued-job')
+	try {
+		await queuedJob.complete
+	} finally {
+		span?.end()
+	}
+}

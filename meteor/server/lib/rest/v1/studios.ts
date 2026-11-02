@@ -181,6 +181,7 @@ export interface StudiosRestAPI {
 /** Values match the `action` property of the request body, as documented in the OpenAPI definition */
 export enum StudioActionType {
 	BLUEPRINT_UPGRADE = 'blueprintUpgrade',
+	REGENERATE_TIMELINE = 'regenerateTimeline',
 }
 
 export interface StudioActionBase {
@@ -191,7 +192,11 @@ export interface StudioActionBlueprintUpgrade extends StudioActionBase {
 	type: StudioActionType.BLUEPRINT_UPGRADE
 }
 
-export type StudioAction = StudioActionBlueprintUpgrade
+export interface StudioActionRegenerateTimeline extends StudioActionBase {
+	type: StudioActionType.REGENERATE_TIMELINE
+}
+
+export type StudioAction = StudioActionBlueprintUpgrade | StudioActionRegenerateTimeline
 
 export interface APIStudio {
 	name: string

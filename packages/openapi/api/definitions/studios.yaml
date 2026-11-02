@@ -414,6 +414,7 @@ resources:
             schema:
               oneOf:
                 - $ref: '#/components/schemas/blueprintUpgrade'
+                - $ref: '#/components/schemas/regenerateTimeline'
               example:
                 action: blueprintUpgrade
       responses:
@@ -579,6 +580,16 @@ components:
         action:
           type: string
           const: blueprintUpgrade
+      required:
+        - action
+      additionalProperties: false
+    regenerateTimeline:
+      type: object
+      description: Regenerates the Studio's timeline, from the active Playlist, or from the Studio baseline if no Playlist is active. This re-runs the blueprints' timeline generation (e.g. onTimelineGenerate, getBaseline) without re-ingesting any Rundown content. Useful e.g. after a config change, when timeline generation depends directly on the config.
+      properties:
+        action:
+          type: string
+          const: regenerateTimeline
       required:
         - action
       additionalProperties: false

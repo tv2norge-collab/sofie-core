@@ -9,7 +9,12 @@ import { Meteor } from 'meteor/meteor'
 import { ClientAPI } from '@sofie-automation/meteor-lib/dist/api/client'
 import { PeripheralDevices, RundownPlaylists, Studios } from '../../../collections'
 import { APIStudioFrom, studioFrom, validateAPIBlueprintConfigForStudio } from './typeConversion'
-import { runUpgradeForStudio, updateStudioBaseline, validateConfigForStudio } from '../../../migration/upgrades'
+import {
+	runUpgradeForStudio,
+	updateStudioBaseline,
+	regenerateStudioTimeline,
+	validateConfigForStudio,
+} from '../../../migration/upgrades'
 import { DBRundownPlaylist } from '@sofie-automation/corelib/dist/dataModel/RundownPlaylist'
 import { ServerClientAPI } from '../../client'
 import { assertNever, literal } from '@sofie-automation/corelib/dist/lib'
@@ -358,16 +363,31 @@ class StudiosServerAPI implements StudiosRestAPI {
 	}
 
 	async studioAction(
-		_connection: Meteor.Connection,
-		_event: string,
+		connection: Meteor.Connection,
+		event: string,
 		studioId: StudioId,
 		action: StudioAction
 	): Promise<ClientAPI.ClientResponse<void>> {
 		switch (action.type) {
 			case StudioActionType.BLUEPRINT_UPGRADE:
 				return ClientAPI.responseSuccess(await runUpgradeForStudio(studioId))
+			case StudioActionType.REGENERATE_TIMELINE:
+				return ServerClientAPI.runUserActionInLog(
+					this.context.getMethodContext(connection),
+					event,
+					getCurrentTime(),
+					'regenerateTimeline',
+					{ studioId },
+					async () => {
+						check(studioId, String)
+
+						assertConnectionHasOneOfPermissions(connection, ...PERMISSIONS_FOR_PLAYOUT_USERACTION)
+
+						return regenerateStudioTimeline(studioId)
+					}
+				)
 			default:
-				assertNever(action.type)
+				assertNever(action)
 				throw new Meteor.Error(400, `Invalid action type`)
 		}
 	}
